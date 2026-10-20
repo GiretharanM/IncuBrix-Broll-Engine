@@ -1,88 +1,210 @@
 import { useState, useEffect } from 'react'
-import { Sparkles, Video, CheckCircle, Clock } from 'lucide-react'
+import { ThemeProvider } from './context/ThemeContext'
+import { Navbar, PageTab } from './components/Navbar'
+import { ToastContainer, ToastMessage } from './components/Toast'
+import { CurlModal } from './components/CurlModal'
+import { NewJobPage } from './pages/NewJobPage'
+import { ProgressPage } from './pages/ProgressPage'
+import { ResultStudioPage } from './pages/ResultStudioPage'
+import { HistoryPage } from './pages/HistoryPage'
+import { MetricsPage } from './pages/MetricsPage'
+import { Job } from './types'
+import { CreateJobPayload, api } from './api'
+import { DEFAULT_DEMO_JOB } from './mockData'
 
 export default function App() {
-  const [healthStatus, setHealthStatus] = useState<string>('Checking...')
-  const [readyStatus, setReadyStatus] = useState<string>('Checking...')
+  const [activeTab, setActiveTabState] = useState<PageTab>(() => {
+    const hash = (typeof window !== 'undefined' ? window.location.hash.replace('#', '') : '')
+    if (hash === 'studio-swap') return 'studio'
+    if (['new', 'progress', 'studio', 'history', 'metrics'].includes(hash as PageTab)) {
+      return hash as PageTab
+    }
+    return 'new'
+  })
+
+  const setActiveTab = (tab: PageTab) => {
+    setActiveTabState(tab)
+    if (typeof window !== 'undefined') {
+      window.location.hash = tab
+    }
+  }
 
   useEffect(() => {
-    fetch('/health')
-      .then(res => res.json())
-      .then(data => setHealthStatus(data.status || 'OK'))
-      .catch(() => setHealthStatus('Connecting...'))
-
-    fetch('/ready')
-      .then(res => res.json())
-      .then(data => setReadyStatus(data.status || 'Ready'))
-      .catch(() => setReadyStatus('Waiting for services...'))
+    const onHash = () => {
+      const h = window.location.hash.replace('#', '')
+      if (h === 'studio-swap') {
+        setActiveTabState('studio')
+      } else if (['new', 'progress', 'studio', 'history', 'metrics'].includes(h as PageTab)) {
+        setActiveTabState(h as PageTab)
+      }
+    }
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
+  const [activeJob, setActiveJob] = useState<Job>(DEFAULT_DEMO_JOB)
+  const [activeJobId, setActiveJobId] = useState<string>(DEFAULT_DEMO_JOB.job_id)
+  const [isSubmittingJob, setIsSubmittingJob] = useState(false)
+
+  // Health and Ready state
+  const [healthStatus, setHealthStatus] = useState('healthy')
+  const [readyStatus, setReadyStatus] = useState('ready')
+
+  // Toast state
+  const [toasts, setToasts] = useState<ToastMessage[]>([])
+
+  // Curl modal state
+  const [isCurlModalOpen, setIsCurlModalOpen] = useState(false)
+  const [curlPayload, setCurlPayload] = useState<CreateJobPayload>({
+    script_text: DEFAULT_DEMO_JOB.script_text,
+    voice: 'en-US-Standard',
+    aspect_ratios: ['16:9', '9:16', '1:1'],
+    style: 'cinematic',
+    avoid: ['watermark', 'violence'],
+    burn_in_captions: true,
+    srt_captions: true,
+  })
+
+  // Poll health and ready on mount
+  useEffect(() => {
+    api.checkHealth().then(res => setHealthStatus(res.status))
+    api.checkReady().then(res => setReadyStatus(res.status))
+  }, [])
+
+  const addToast = (title: string, description?: string, type: 'success' | 'warning' | 'error' | 'info' = 'success') => {
+    const id = `toast-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`
+    setToasts(prev => [...prev, { id, title, description, type }])
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id))
+    }, 4500)
+  }
+
+  const dismissToast = (id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id))
+  }
+
+  // Handle Job Submission
+  const handleCreateJob = async (payload: CreateJobPayload) => {
+    setIsSubmittingJob(true)
+    try {
+      const res = await api.createJob(payload)
+      setActiveJobId(res.job_id)
+
+      addToast(
+        'B-Roll Job Queued',
+        `Job ${res.job_id} accepted. Beginning autonomous 10-stage processing.`,
+        'success'
+      )
+
+      // Navigate to live progress page
+      setActiveTab('progress')
+    } catch (e: any) {
+      addToast('Job Creation Error', e.message || 'Failed to submit job', 'error')
+    } finally {
+      setIsSubmittingJob(false)
+    }
+  }
+
+  // Handle Job Complete in Progress page
+  const handleJobComplete = (completedJob: Job) => {
+    setActiveJob(completedJob)
+    addToast(
+      'Media Rendering Finished!',
+      'All aspect ratios, smart crops, and captions have been rendered.',
+      'success'
+    )
+  }
+
+  // Open job in Studio from History
+  const handleOpenJobInStudio = async (jobId: string) => {
+    setActiveJobId(jobId)
+    const jobData = await api.getJob(jobId)
+    setActiveJob(jobData)
+    setActiveTab('studio')
+    addToast('Loaded Job in Studio', `Viewing ${jobId}`, 'info')
+  }
+
+  // Handle clip swap in Studio
+  const handleClipSwapped = (updatedJob: Job, message: string) => {
+    setActiveJob(updatedJob)
+    addToast('Clip Re-rendered', message, 'success')
+  }
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-400">
-            <Video className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold tracking-tight">IncuBrix B-roll Engine</h1>
-            <p className="text-xs text-slate-400">Automated, License-Clean B-Roll Video Studio</p>
-          </div>
-        </div>
-        <div className="flex items-center space-x-3 text-xs">
-          <span className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-slate-800 text-slate-300">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>API: {healthStatus}</span>
-          </span>
-          <span className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-slate-800 text-slate-300">
-            <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Ready: {readyStatus}</span>
-          </span>
-        </div>
-      </header>
+    <ThemeProvider>
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-slate-950 transition-colors">
+        {/* Navigation Bar */}
+        <Navbar
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
+          onOpenCurl={() => setIsCurlModalOpen(true)}
+          healthStatus={healthStatus}
+          readyStatus={readyStatus}
+        />
 
-      <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-10">
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 mb-8 shadow-xl">
-          <div className="max-w-2xl">
-            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-medium mb-4">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Phase 1 Initialized</span>
-            </div>
-            <h2 className="text-3xl font-extrabold tracking-tight mb-3">
-              Transform Voiceover & Script into Precision B-Roll Videos
-            </h2>
-            <p className="text-slate-400 leading-relaxed mb-6">
-              Full-stack media pipeline with word-level speech alignment, semantic scene segmentation, 
-              LLM metaphor disambiguation, CLIP ranking, and 0-repeat license-clean footage generation.
-            </p>
-          </div>
+        {/* Main Content Area */}
+        <main className="flex-1 pb-16">
+          {activeTab === 'new' && (
+            <NewJobPage
+              onSubmit={handleCreateJob}
+              onOpenCurlWithPayload={payload => {
+                setCurlPayload(payload)
+                setIsCurlModalOpen(true)
+              }}
+              isLoading={isSubmittingJob}
+            />
+          )}
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8 pt-8 border-t border-slate-800/80">
-            <div className="p-4 rounded-lg bg-slate-950 border border-slate-800/80">
-              <div className="text-emerald-400 font-semibold mb-1 flex items-center gap-2">
-                <Clock className="w-4 h-4" /> 10-Stage Pipeline
-              </div>
-              <p className="text-xs text-slate-400">Ingest, VAD, Whisper/TTS, Segment, LLM, Retrieval, CLIP, Normalize, Multi-render, Manifest.</p>
+          {activeTab === 'progress' && (
+            <ProgressPage
+              jobId={activeJobId}
+              onJobComplete={handleJobComplete}
+              onNavigateToStudio={() => setActiveTab('studio')}
+            />
+          )}
+
+          {activeTab === 'studio' && (
+            <ResultStudioPage
+              job={activeJob}
+              onClipSwapped={handleClipSwapped}
+            />
+          )}
+
+          {activeTab === 'history' && (
+            <HistoryPage
+              onOpenJobInStudio={handleOpenJobInStudio}
+              onToast={addToast}
+            />
+          )}
+
+          {activeTab === 'metrics' && <MetricsPage />}
+        </main>
+
+        {/* Global Footer */}
+        <footer className="border-t border-slate-900 bg-slate-950 px-6 py-6 text-center text-xs text-slate-500">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-slate-400">
+              <span className="font-semibold text-slate-300">IncuBrix B-Roll Engine v1.0.0</span>
+              <span>•</span>
+              <span>H.264 30fps Frame-Accurate Pipeline</span>
             </div>
-            <div className="p-4 rounded-lg bg-slate-950 border border-slate-800/80">
-              <div className="text-emerald-400 font-semibold mb-1 flex items-center gap-2">
-                <CheckCircle className="w-4 h-4" /> Zero-Key Mock Support
-              </div>
-              <p className="text-xs text-slate-400">100% offline development & tests with mock STT, TTS, LLM, Footage and Vision adapters.</p>
-            </div>
-            <div className="p-4 rounded-lg bg-slate-950 border border-slate-800/80">
-              <div className="text-emerald-400 font-semibold mb-1 flex items-center gap-2">
-                <Video className="w-4 h-4" /> Multi-Ratio Output
-              </div>
-              <p className="text-xs text-slate-400">H.264 1080p-class renders for 16:9, 9:16 (saliency crop), and 1:1 with burned/SRT captions.</p>
+            <div className="text-slate-500 text-[11px]">
+              OpenAPI 3.1 • Strict Zero-Reuse Policy • Commercial Clean Licences
             </div>
           </div>
-        </div>
-      </main>
+        </footer>
 
-      <footer className="border-t border-slate-800 px-6 py-4 text-center text-xs text-slate-500">
-        IncuBrix B-roll Engine • Phase 1 Core Infrastructure
-      </footer>
-    </div>
+        {/* cURL Modal */}
+        <CurlModal
+          isOpen={isCurlModalOpen}
+          onClose={() => setIsCurlModalOpen(false)}
+          payload={curlPayload}
+          onCopied={() => addToast('Copied', 'cURL command copied to clipboard', 'info')}
+        />
+
+        {/* Toast Container */}
+        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+      </div>
+    </ThemeProvider>
   )
 }

@@ -89,3 +89,29 @@ class ReadyResponse(BaseModel):
     postgres: bool
     redis: bool
     minio: bool
+
+class JobListItemResponse(BaseModel):
+    job_id: str
+    status: str
+    progress: int
+    input_type: str
+    script_preview: Optional[str] = None
+    aspect_ratios: List[str] = Field(default_factory=lambda: ["16:9"])
+    duration_seconds: float = 0.0
+    cost_estimate_usd: float = 0.0
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+
+class JobMetricsResponse(BaseModel):
+    total_jobs: int = 0
+    succeeded_jobs: int = 0
+    failed_jobs: int = 0
+    avg_turnaround_seconds: float = 0.0
+    cost_per_minute_usd: float = 0.0
+    narration_coverage_ratio: float = 1.0
+    avg_relevance_score: float = 0.85
+    repeat_clip_rate: float = 0.0
+    success_rate_percent: float = 100.0
+    source_distribution: Dict[str, float] = Field(default_factory=dict)
+    ratio_distribution: Dict[str, float] = Field(default_factory=dict)
+
