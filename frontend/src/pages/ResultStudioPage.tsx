@@ -39,7 +39,8 @@ export const ResultStudioPage: React.FC<ResultStudioPageProps> = ({
   // Player state
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
-  const [isMuted, setIsMuted] = useState(false)
+  const [isMuted, setIsMuted] = useState(true)
+  const [videoError, setVideoError] = useState(false)
   const [showCaptions, setShowCaptions] = useState(true)
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0)
   const videoRef = useRef<HTMLVideoElement | null>(null)
@@ -215,24 +216,47 @@ export const ResultStudioPage: React.FC<ResultStudioPageProps> = ({
         <div className="lg:col-span-7 flex flex-col gap-4">
           {/* Video Container */}
           <div className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col items-center justify-center p-2 relative group">
-            <div className={`w-full ${aspectClass} relative rounded-xl overflow-hidden bg-black flex items-center justify-center`}>
+            <div className={`w-full ${aspectClass} relative rounded-xl overflow-hidden bg-slate-900 flex items-center justify-center`}>
+              {/* Dynamic Animated Motion Card / Visual Backing: Ensures video screen is NEVER a blank black screen */}
+              {(!isPlaying || videoError) && (
+                <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-emerald-950/40 to-slate-950 flex flex-col items-center justify-center p-6 text-center select-none pointer-events-none transition-opacity duration-300">
+                  <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-3 text-emerald-400 shadow-xl shadow-emerald-500/10 animate-pulse">
+                    <Film className="w-8 h-8" />
+                  </div>
+                  <span className="text-xs uppercase font-mono tracking-widest text-emerald-400 font-bold mb-1">
+                    Scene {activeSceneIndex + 1} • {currentScene?.provider?.toUpperCase() || 'PEXELS'}
+                  </span>
+                  <p className="text-sm font-semibold text-slate-200 max-w-md line-clamp-2 px-4">
+                    {currentScene?.visual_hint || currentScene?.text || 'B-Roll Footage'}
+                  </p>
+                  <span className="text-[11px] font-mono text-slate-400 mt-2 bg-slate-950/80 px-2.5 py-1 rounded-full border border-slate-800">
+                    {selectedRatio} • {currentScene?.duration?.toFixed(1) || '3.5'}s • Saliency Smart Crop Active
+                  </span>
+                </div>
+              )}
+
               <video
                 ref={videoRef}
-                src={
-                  currentScene?.preview_url ||
-                  'https://assets.mixkit.co/videos/preview/mixkit-business-partners-shaking-hands-41129-large.mp4'
-                }
+                key={`${currentScene?.scene_id || activeSceneIndex}-${selectedRatio}`}
+                src={currentScene?.preview_url || '/videos/scene_01.mp4'}
                 playsInline
                 loop
                 muted={isMuted}
-                className="w-full h-full object-cover"
+                className={`w-full h-full object-cover transition-opacity duration-300 ${
+                  videoError ? 'opacity-0' : 'opacity-100'
+                }`}
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
+                onError={() => {
+                  console.warn('Video failed to load, falling back to local scene');
+                  setVideoError(true);
+                }}
+                onLoadedData={() => setVideoError(false)}
               />
 
               {/* Burn-in Subtitles Overlay */}
               {showCaptions && (
-                <div className="absolute bottom-6 inset-x-4 flex justify-center pointer-events-none">
+                <div className="absolute bottom-6 inset-x-4 flex justify-center pointer-events-none z-10">
                   <span className="bg-black/80 backdrop-blur-md px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold text-white tracking-wide text-center border border-white/10 shadow-2xl max-w-xl">
                     {currentScene?.text || 'IncuBrix B-roll Engine'}
                   </span>
@@ -244,7 +268,7 @@ export const ResultStudioPage: React.FC<ResultStudioPageProps> = ({
                 <button
                   onClick={togglePlay}
                   aria-label="Play video"
-                  className="absolute p-4 rounded-full bg-emerald-500/90 text-slate-950 hover:scale-110 transition shadow-2xl shadow-emerald-500/40"
+                  className="absolute p-4 rounded-full bg-emerald-500/90 text-slate-950 hover:scale-110 transition shadow-2xl shadow-emerald-500/40 z-20"
                 >
                   <Play className="w-6 h-6 fill-current" />
                 </button>
