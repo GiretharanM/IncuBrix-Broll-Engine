@@ -1,0 +1,270 @@
+openapi: 3.1.0
+info:
+  title: IncuBrix B-roll Engine API
+  description: Containerised media pipeline turning voiceover or scripts into finished, licence-clean B-roll video.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000
+    description: Local Docker development server
+paths:
+  /health:
+    get:
+      tags: [System]
+      summary: Liveness health probe
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /ready:
+    get:
+      tags: [System]
+      summary: Readiness probe
+      responses:
+        '200':
+          description: Subsystem readiness status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyResponse'
+  /api/v1/broll/jobs:
+    post:
+      tags: [Jobs]
+      summary: Submit a B-roll generation job
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema:
+            type: string
+          required: false
+          description: Unique client key ensuring exact once job execution
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobCreateRequest'
+      responses:
+        '202':
+          description: Job accepted and queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobCreateResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/jobs/{job_id}:
+    get:
+      tags: [Jobs]
+      summary: Retrieve job status, progress and artifacts
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Current job status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatusResponse'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/jobs/{job_id}/candidates/{scene_id}:
+    get:
+      tags: [Scenes]
+      summary: List candidate footage clips for scene swap
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: scene_id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of alternative candidates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SceneCandidateResponse'
+  /api/v1/jobs/{job_id}/scenes/{scene_id}/clip:
+    patch:
+      tags: [Scenes]
+      summary: Swap clip and trigger partial re-render
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: scene_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SwapClipRequest'
+      responses:
+        '200':
+          description: Clip replaced and segment re-rendered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SwapClipResponse'
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status: { type: string }
+        timestamp: { type: string }
+        version: { type: string }
+      required: [status, timestamp, version]
+    ReadyResponse:
+      type: object
+      properties:
+        status: { type: string }
+        postgres: { type: boolean }
+        redis: { type: boolean }
+        minio: { type: boolean }
+      required: [status, postgres, redis, minio]
+    JobCreateRequest:
+      type: object
+      properties:
+        script_text: { type: string, nullable: true }
+        audio_url: { type: string, nullable: true }
+        scenes:
+          type: array
+          items:
+            type: object
+            properties:
+              text: { type: string }
+              visual_hint: { type: string, nullable: true }
+            required: [text]
+        voice: { type: string, default: "en-US-Standard" }
+        aspect_ratios:
+          type: array
+          items: { type: string }
+          default: ["16:9"]
+        style: { type: string, default: "cinematic" }
+        avoid:
+          type: array
+          items: { type: string }
+        burn_in_captions: { type: boolean, default: true }
+        srt_captions: { type: boolean, default: true }
+        callback_url: { type: string, nullable: true }
+    JobCreateResponse:
+      type: object
+      properties:
+        job_id: { type: string }
+        status: { type: string }
+        message: { type: string }
+      required: [job_id, status, message]
+    JobStatusResponse:
+      type: object
+      properties:
+        job_id: { type: string }
+        status: { type: string }
+        progress: { type: integer }
+        current_stage: { type: string }
+        aspect_ratios:
+          type: array
+          items: { type: string }
+        scenes:
+          type: array
+          items:
+            $ref: '#/components/schemas/SceneResponse'
+        result_urls: { type: object, additionalProperties: { type: string } }
+        warnings:
+          type: array
+          items: { type: string }
+        error_message: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+      required: [job_id, status, progress, current_stage, aspect_ratios, created_at, updated_at]
+    SceneResponse:
+      type: object
+      properties:
+        scene_id: { type: string }
+        scene_index: { type: integer }
+        text: { type: string }
+        visual_hint: { type: string, nullable: true }
+        visual_query: { type: string, nullable: true }
+        start_time: { type: number }
+        end_time: { type: number }
+        duration: { type: number }
+        selected_clip_id: { type: string, nullable: true }
+        selection_reason: { type: string, nullable: true }
+        relevance_score: { type: number, nullable: true }
+        source_choice_reason: { type: string, nullable: true }
+        ai_generated: { type: boolean }
+        segment_hash: { type: string, nullable: true }
+      required: [scene_id, scene_index, text, start_time, end_time, duration, ai_generated]
+    SceneCandidateResponse:
+      type: object
+      properties:
+        id: { type: string }
+        provider: { type: string }
+        external_id: { type: string }
+        title: { type: string }
+        preview_url: { type: string }
+        download_url: { type: string }
+        duration: { type: number }
+        relevance_score: { type: number }
+        reason: { type: string, nullable: true }
+        is_selected: { type: boolean }
+        ai_generated: { type: boolean }
+        licence_name: { type: string }
+        attribution: { type: string, nullable: true }
+      required: [id, provider, external_id, title, preview_url, download_url, duration, relevance_score, is_selected, ai_generated, licence_name]
+    SwapClipRequest:
+      type: object
+      properties:
+        candidate_id: { type: string, nullable: true }
+        clip_url: { type: string, nullable: true }
+    SwapClipResponse:
+      type: object
+      properties:
+        job_id: { type: string }
+        scene_id: { type: string }
+        new_clip_id: { type: string }
+        time_saved_seconds: { type: number }
+        re_render_duration_seconds: { type: number }
+        message: { type: string }
+      required: [job_id, scene_id, new_clip_id, time_saved_seconds, re_render_duration_seconds, message]
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string, example: "EMPTY_SCRIPT" }
+            message: { type: string }
+            retryable: { type: boolean }
+            details: { type: object, nullable: true }
+          required: [code, message, retryable]
+      required: [error]
