@@ -54,8 +54,14 @@ export const api = {
       if (res.ok) {
         return await res.json()
       }
-      const err = await res.json()
-      throw new Error(err?.error?.message || 'Failed to submit job')
+      let errMsg = 'Failed to submit job'
+      try {
+        const err = await res.json()
+        errMsg = err?.error?.message || errMsg
+      } catch {
+        // non-JSON response from server (e.g. 404/502 HTML)
+      }
+      throw new Error(errMsg)
     } catch (e: any) {
       console.warn('API call failed, falling back to simulated job creation:', e.message)
       // Provide an immediate simulated job ID for smooth UI experience
