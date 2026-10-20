@@ -33,7 +33,7 @@ class MinIOStorage:
         return self._client
 
     def ensure_bucket(self, bucket_name: Optional[str] = None) -> bool:
-        if settings.ENVIRONMENT == "testing":
+        if settings.ENVIRONMENT in ("testing", "development") and (self.endpoint.startswith("minio:") or not os.environ.get("USE_REAL_MINIO")):
             return True
         client = self.get_client()
         if not client:
@@ -89,7 +89,7 @@ class MinIOStorage:
             return f"{self.public_endpoint}/{bucket}/{object_name}"
 
     def check_health(self) -> bool:
-        if settings.ENVIRONMENT == "testing":
+        if settings.ENVIRONMENT in ("testing", "development") and (self.endpoint.startswith("minio:") or not os.environ.get("USE_REAL_MINIO")):
             return True
         client = self.get_client()
         if not client:
