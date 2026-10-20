@@ -95,9 +95,16 @@ class FasterWhisperSTTAdapter(BaseSTTAdapter):
                 "probability": 0.98,
             })
 
+        # Detect language from script characters (Hindi / Tamil / English)
+        detected_lang = "en"
+        if re.search(r"[\u0900-\u097F]", chosen_text):
+            detected_lang = "hi"
+        elif re.search(r"[\u0B80-\u0BFF]", chosen_text):
+            detected_lang = "ta"
+
         return {
             "text": chosen_text,
-            "language": "en",
+            "language": detected_lang,
             "duration": round(duration, 2),
             "words": word_list,
         }

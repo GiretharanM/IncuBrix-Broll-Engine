@@ -1,6 +1,6 @@
 import logging
 from typing import List, Dict, Any, Optional, Set, Tuple
-from app.adapters.vision.mock_vision import MockVisionScorer
+from app.adapters.vision.vlm_scorer import VLMVisionScorer
 from app.adapters.footage.generative_adapter import GenerativeFootageAdapter
 from app.config import settings
 
@@ -15,7 +15,7 @@ class CandidateRanker:
         vision_scorer=None,
     ):
         self.stock_threshold = stock_threshold
-        self.vision_scorer = vision_scorer or MockVisionScorer()
+        self.vision_scorer = vision_scorer or VLMVisionScorer()
         self.generative_fallback = GenerativeFootageAdapter()
 
     def rank_and_select_clip(
