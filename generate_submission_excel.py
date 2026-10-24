@@ -65,7 +65,7 @@ details = [
     ("Live demo URL", "https://redeem-each-photograph-smaller.trycloudflare.com"),
     ("Live demo access token or login", "None required (Publicly accessible)"),
     ("Cold-start wait time", "< 2 seconds"),
-    ("Repository URL", "https://github.com/Giretharan-M/IncuBrix-Broll-Engine"),
+    ("Repository URL", "https://github.com/GiretharanM/IncuBrix-Broll-Engine"),
     ("Demo video URL", "https://redeem-each-photograph-smaller.trycloudflare.com/demo.mp4"),
     ("REPORT.md link", "REPORT.md in repository root"),
     ("Compute used", "Laptop (Intel Core i5, 16GB RAM, Windows 11)"),
