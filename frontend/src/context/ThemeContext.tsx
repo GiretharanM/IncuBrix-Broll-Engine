@@ -14,13 +14,13 @@ const ThemeContext = createContext<ThemeContextType>({
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setTheme] = useState<Theme>(() => {
-    const saved = localStorage.getItem('incubrix_theme')
+    const saved = localStorage.getItem('broll_studio_theme') || localStorage.getItem('incubrix_theme')
     if (saved === 'light' || saved === 'dark') return saved
     return 'dark'
   })
 
   useEffect(() => {
-    localStorage.setItem('incubrix_theme', theme)
+    localStorage.setItem('broll_studio_theme', theme)
     if (theme === 'dark') {
       document.documentElement.classList.add('dark')
     } else {

@@ -21,6 +21,11 @@ class Job(Base):
     current_stage = Column(String(64), nullable=False, default="Queued")
 
     input_type = Column(String(32), nullable=False, default="script_text")
+    prompt = Column(Text, nullable=True)
+    duration_seconds = Column(Integer, nullable=True, default=20)
+    narration = Column(Boolean, nullable=True, default=False)
+    seed = Column(Integer, nullable=True)
+    scene_captions_without_narration = Column(Boolean, nullable=True, default=False)
     script_text = Column(Text, nullable=True)
     audio_url = Column(String(1024), nullable=True)
     audio_path = Column(String(1024), nullable=True)
@@ -70,6 +75,7 @@ class Scene(Base):
     source_choice_reason = Column(Text, nullable=True)
     ai_generated = Column(Boolean, nullable=False, default=False)
     segment_hash = Column(String(64), nullable=True, index=True)
+    preview_url = Column(String(1024), nullable=True)
 
     created_at = Column(DateTime(timezone=True), nullable=False, default=utc_now)
 

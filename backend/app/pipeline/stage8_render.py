@@ -384,7 +384,7 @@ class VideoRenderer:
           Muxed into a single MP4 with faststart.
         """
         cmd = [
-            "ffmpeg",
+            self.normalizer.ffmpeg_binary,
             "-y",
             # Input 1: concatenated video segments
             "-f", "concat",
@@ -402,8 +402,10 @@ class VideoRenderer:
             cmd.extend(["-vf", f"ass='{safe_ass}'"])
 
         cmd.extend([
-            # Video codec
+            # Video codec — standard browser playable H.264 High/Main
             "-c:v", TARGET_CODEC,
+            "-profile:v", "high",
+            "-level", "4.1",
             "-preset", "medium",
             "-crf", "20",
             "-pix_fmt", TARGET_PIX_FMT,

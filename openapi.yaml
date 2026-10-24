@@ -211,7 +211,33 @@ components:
       - timestamp
       title: HealthResponse
     JobCreateRequest:
-      properties:
+        prompt:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Prompt
+          description: One short idea/prompt for instant video creation (e.g. 'cat walking')
+        duration_seconds:
+          type: integer
+          title: Duration Seconds
+          description: Target video duration in seconds (8-60)
+          default: 20
+        narration:
+          type: boolean
+          title: Narration
+          description: Whether to synthesize narration voiceover or produce an ambient video
+          default: false
+        seed:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Seed
+          description: Random seed for reproducible prompt expansion and visual variations
+        scene_captions_without_narration:
+          type: boolean
+          title: Scene Captions Without Narration
+          description: Use scene text as subtitles when narration is disabled
+          default: false
         script_text:
           anyOf:
           - type: string

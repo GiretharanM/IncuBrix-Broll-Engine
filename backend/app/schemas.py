@@ -7,6 +7,11 @@ class SceneInput(BaseModel):
     visual_hint: Optional[str] = Field(None, description="Optional direction or keywords for footage matching")
 
 class JobCreateRequest(BaseModel):
+    prompt: Optional[str] = Field(None, description="One short idea/prompt for instant video creation (e.g. 'cat walking')")
+    duration_seconds: Optional[int] = Field(20, ge=8, le=60, description="Target video duration in seconds (8-60)")
+    narration: Optional[bool] = Field(False, description="Whether to synthesize narration voiceover or produce an ambient video")
+    seed: Optional[int] = Field(None, description="Random seed for reproducible prompt expansion and visual variations")
+    scene_captions_without_narration: Optional[bool] = Field(False, description="Use scene text as subtitles when narration is disabled")
     script_text: Optional[str] = Field(None, description="Full script text to be spoken via TTS")
     audio_url: Optional[str] = Field(None, description="URL of pre-recorded voiceover audio file")
     scenes: Optional[List[SceneInput]] = Field(None, description="Pre-segmented scene list")
@@ -53,6 +58,10 @@ class SceneResponse(BaseModel):
     source_choice_reason: Optional[str] = None
     ai_generated: bool = False
     segment_hash: Optional[str] = None
+    preview_url: Optional[str] = None
+    provider: Optional[str] = None
+    link: Optional[str] = None
+    licence: Optional[str] = None
 
 class JobStatusResponse(BaseModel):
     job_id: str
@@ -89,6 +98,7 @@ class ReadyResponse(BaseModel):
     postgres: bool
     redis: bool
     minio: bool
+    providers: Dict[str, bool] = Field(default_factory=dict)
 
 class JobListItemResponse(BaseModel):
     job_id: str

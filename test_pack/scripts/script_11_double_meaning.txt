@@ -1,0 +1,1 @@
+We deposited our software package into the code bank and deployed it to the cloud. Using our wireless mouse, we wrote an automated script in python that calculates customer lifetime value.

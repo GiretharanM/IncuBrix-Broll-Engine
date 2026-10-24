@@ -44,6 +44,19 @@ postgres_data/
 media_cache/
 output_media/
 temp_renders/
+incubrix.db
+*.db
+*.sqlite3
+cloudflared.exe
+results/
+static/
+uploads/
+outputs/
+test_prof.mp4
+test_video.mp4
+scratch_*.py
+generate_submission_excel.py
+
 
 # IDE
 .vscode/

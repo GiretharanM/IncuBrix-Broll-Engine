@@ -17,9 +17,9 @@ class FootageRetrievalEngine:
         self.mock = MockFootageProvider()
 
         # Circuit breakers for external APIs
-        self.pexels_breaker = CircuitBreaker("Pexels", failure_threshold=2, recovery_timeout_seconds=30.0)
-        self.pixabay_breaker = CircuitBreaker("Pixabay", failure_threshold=2, recovery_timeout_seconds=30.0)
-        self.generative_breaker = CircuitBreaker("Generative", failure_threshold=3, recovery_timeout_seconds=30.0)
+        self.pexels_breaker = CircuitBreaker("Pexels", failure_threshold=5, recovery_timeout_seconds=30.0)
+        self.pixabay_breaker = CircuitBreaker("Pixabay", failure_threshold=5, recovery_timeout_seconds=30.0)
+        self.generative_breaker = CircuitBreaker("Generative", failure_threshold=5, recovery_timeout_seconds=30.0)
 
     def retrieve_candidates_for_scene(
         self,
@@ -27,6 +27,7 @@ class FootageRetrievalEngine:
         avoid: Optional[List[str]] = None,
         count: int = 5,
         warnings_out: Optional[List[str]] = None,
+        duration: Optional[float] = None,
     ) -> List[Dict[str, Any]]:
         """
         Retrieves footage candidates with cascading circuit-breaker resilience:
@@ -35,60 +36,68 @@ class FootageRetrievalEngine:
         """
         candidates: List[Dict[str, Any]] = []
 
-        # 1. Primary: Pexels (guarded by circuit breaker)
-        if settings.FOOTAGE_ADAPTER not in ("mock", "offline") and settings.PEXELS_API_KEY:
-            try:
-                candidates = self.pexels_breaker.call(
-                    self.pexels.search_footage, query=query, count=count, avoid=avoid
-                )
-            except CircuitBreakerOpenException as cbe:
-                logger.warning(f"Pexels circuit OPEN: {cbe}")
-                if warnings_out is not None:
-                    warnings_out.append(f"Pexels circuit breaker is OPEN ({cbe}). Failing over to Pixabay.")
-            except Exception as e:
-                logger.warning(f"Pexels request failed: {e}")
-                if warnings_out is not None:
-                    warnings_out.append(f"Pexels retrieval failed for query '{query}': {e}. Failing over to Pixabay.")
+        # Iterate through providers according to FOOTAGE_PROVIDERS priority order
+        providers_order = [p.strip().lower() for p in settings.FOOTAGE_PROVIDERS.split(",") if p.strip()]
+        if not providers_order:
+            providers_order = ["pixabay", "pexels", "mock", "generative"]
 
-        # 2. Secondary: Pixabay (guarded by circuit breaker)
-        if not candidates and settings.FOOTAGE_ADAPTER not in ("mock", "offline") and settings.PIXABAY_API_KEY:
-            try:
-                candidates = self.pixabay_breaker.call(
-                    self.pixabay.search_footage, query=query, count=count, avoid=avoid
-                )
-                if candidates and warnings_out is not None:
-                    warnings_out.append(f"Retrieved footage from secondary provider Pixabay for query '{query}'.")
-            except CircuitBreakerOpenException as cbe:
-                logger.warning(f"Pixabay circuit OPEN: {cbe}")
-                if warnings_out is not None:
-                    warnings_out.append(f"Pixabay circuit breaker is OPEN ({cbe}). Failing over to local mock catalog.")
-            except Exception as e:
-                logger.warning(f"Pixabay request failed: {e}")
-                if warnings_out is not None:
-                    warnings_out.append(f"Pixabay retrieval failed for query '{query}': {e}. Failing over to local catalog.")
+        for prov in providers_order:
+            if candidates:
+                break
 
-        # 3. Tertiary: Local Clean Mock Footage Catalog
-        if not candidates:
-            try:
-                candidates = self.mock.search_footage(query=query, count=count, avoid=avoid)
-            except Exception as e:
-                logger.warning(f"Mock footage search failed: {e}")
+            if prov == "pixabay" and settings.PIXABAY_API_KEY and not settings.PIXABAY_API_KEY.startswith("mock"):
+                try:
+                    candidates = self.pixabay_breaker.call(
+                        self.pixabay.search_footage, query=query, count=count, avoid=avoid
+                    )
+                    if candidates and warnings_out is not None:
+                        warnings_out.append(f"Retrieved footage from Pixabay for query '{query}'.")
+                except CircuitBreakerOpenException as cbe:
+                    logger.warning(f"Pixabay circuit OPEN: {cbe}")
+                    if warnings_out is not None:
+                        warnings_out.append(f"Pixabay circuit breaker is OPEN ({cbe}). Failing over.")
+                except Exception as e:
+                    logger.warning(f"Pixabay request failed: {e}")
+                    if warnings_out is not None:
+                        warnings_out.append(f"Pixabay retrieval failed for query '{query}': {e}. Failing over.")
 
-        # 4. Quaternary: Generative AI / Ken-Burns Motion fallback
-        if not candidates:
-            try:
-                candidates = self.generative_breaker.call(
-                    self.generative.search_footage, query=query, count=count, avoid=avoid
-                )
-                if warnings_out is not None:
-                    warnings_out.append(f"No stock footage found for '{query}'. Generated safe AI Ken-Burns fallback.")
-            except Exception as e:
-                logger.warning(f"Generative synthesis failed: {e}")
+            elif prov == "pexels" and settings.PEXELS_API_KEY and not settings.PEXELS_API_KEY.startswith("mock"):
+                try:
+                    candidates = self.pexels_breaker.call(
+                        self.pexels.search_footage, query=query, count=count, avoid=avoid
+                    )
+                    if candidates and warnings_out is not None:
+                        warnings_out.append(f"Retrieved footage from Pexels for query '{query}'.")
+                except CircuitBreakerOpenException as cbe:
+                    logger.warning(f"Pexels circuit OPEN: {cbe}")
+                    if warnings_out is not None:
+                        warnings_out.append(f"Pexels circuit breaker is OPEN ({cbe}). Failing over.")
+                except Exception as e:
+                    logger.warning(f"Pexels request failed: {e}")
+                    if warnings_out is not None:
+                        warnings_out.append(f"Pexels retrieval failed for query '{query}': {e}. Failing over.")
+
+            elif prov == "mock":
+                try:
+                    candidates = self.mock.search_footage(query=query, count=count, avoid=avoid)
+                except Exception as e:
+                    logger.warning(f"Mock footage search failed: {e}")
+
+            elif prov == "generative":
+                try:
+                    candidates = self.generative_breaker.call(
+                        self.generative.search_footage, query=query, count=count, avoid=avoid, duration=duration
+                    )
+                    if candidates and warnings_out is not None:
+                        warnings_out.append(f"Generated safe AI Ken-Burns fallback for '{query}'.")
+                except Exception as e:
+                    logger.warning(f"Generative synthesis failed: {e}")
 
         # 5. Ultimate Fallback: Safe Solid Card (job never crashes!)
         if not candidates:
             logger.error(f"All footage sources failed for query '{query}'. Synthesizing emergency safe card.")
             fallback_id = f"fallback_card_{abs(hash(query)) % 10000}"
+            clip_dur = float(duration) if duration is not None else 3.5
             candidates = [{
                 "id": fallback_id,
                 "provider": "fallback_title_card",
@@ -96,11 +105,14 @@ class FootageRetrievalEngine:
                 "title": f"Safe Fallback: {query.capitalize()}",
                 "preview_url": "",
                 "download_url": "mock://fallback/title_card.mp4",
-                "duration": 5.0,
+                "duration": clip_dur,
                 "width": 1920,
                 "height": 1080,
-                "licence_name": "IncuBrix Clean Fallback",
-                "attribution": "IncuBrix System Emergency Generator",
+                "licence_name": "None (System Fallback)",
+                "licence": "None (System Fallback)",
+                "uploader": "None (System Fallback)",
+                "page_url": "",
+                "attribution": f"Fallback card generated for '{query}'",
                 "ai_generated": True,
                 "relevance_score": 0.28,
                 "tags": [query.lower(), "fallback"],

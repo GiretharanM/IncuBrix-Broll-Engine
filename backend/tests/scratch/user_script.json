@@ -1,0 +1,9 @@
+{
+  "script_text": "A beautiful sunrise illuminates the snow-covered mountain peaks as golden sunlight spreads across the peaceful alpine lake. A powerful waterfall cascades over rugged cliffs into a crystal-clear pool surrounded by lush green forests. As night falls, a vibrant modern city skyline comes alive with glowing skyscrapers, busy streets, and sparkling lights.",
+  "voice": "en-US-Standard",
+  "aspect_ratios": ["16:9"],
+  "style": "cinematic",
+  "avoid": ["watermark"],
+  "burn_in_captions": true,
+  "srt_captions": true
+}

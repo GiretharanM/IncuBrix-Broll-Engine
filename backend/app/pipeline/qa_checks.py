@@ -220,22 +220,24 @@ class OutputQAChecker:
             ))
 
     def _check_codecs(self, report: QAReport, path: str):
-        """Verify video codec is H.264 and audio codec is AAC."""
+        """Verify video codec is H.264, pix_fmt is yuv420p, and audio codec is AAC."""
         try:
             probe = self.normalizer.probe_clip(path)
             video_codec = probe.get("codec", "unknown")
+            pix_fmt = probe.get("pix_fmt", "unknown")
 
             # H.264 is reported as "h264" by ffprobe
             h264_ok = video_codec.lower() in ("h264", "libx264")
+            pix_fmt_ok = pix_fmt.lower() in ("yuv420p", "unknown")
 
             report.add_check(QAResult(
                 check_name="video_codec",
-                passed=h264_ok,
-                expected="h264",
-                actual=video_codec,
+                passed=h264_ok and pix_fmt_ok,
+                expected="h264 (yuv420p)",
+                actual=f"{video_codec} ({pix_fmt})",
                 severity="error",
-                message="" if h264_ok else (
-                    f"Video codec mismatch: expected h264, got {video_codec}"
+                message="" if (h264_ok and pix_fmt_ok) else (
+                    f"Video codec/format mismatch: expected h264 yuv420p, got {video_codec} {pix_fmt}"
                 ),
             ))
         except Exception as e:
@@ -291,21 +293,24 @@ class OutputQAChecker:
     ):
         """
         Check that the output video duration matches the narration duration
-        within an acceptable tolerance (±0.5 seconds).
+        within an acceptable tolerance of 100 ms (±0.100 seconds).
         """
         try:
             probe = self.normalizer.probe_clip(path)
             video_duration = probe["duration"]
             drift = abs(video_duration - narration_duration)
 
+            # Enforce 100ms tolerance
+            passed = drift <= 0.100
+
             report.add_check(QAResult(
                 check_name="audio_drift",
-                passed=drift <= 0.5,
-                expected=f"drift <= 0.5s (narration: {narration_duration:.2f}s)",
-                actual=f"video: {video_duration:.2f}s, drift: {drift:.2f}s",
-                severity="warning",
-                message="" if drift <= 0.5 else (
-                    f"Audio drift detected: {drift:.2f}s between narration "
+                passed=passed,
+                expected=f"drift <= 0.100s (target: {narration_duration:.2f}s)",
+                actual=f"video: {video_duration:.2f}s, drift: {drift:.3f}s",
+                severity="error" if drift > 0.500 else "warning",
+                message="" if passed else (
+                    f"Audio drift detected: {drift:.3f}s exceeds 100ms tolerance between narration "
                     f"({narration_duration:.2f}s) and video ({video_duration:.2f}s)"
                 ),
             ))

@@ -1,0 +1,20 @@
+[
+  {
+    "scene_index": 0,
+    "text": "Sun rising over mist-covered lake",
+    "visual_hint": "sunrise alpine lake calm waters",
+    "duration": 4.0
+  },
+  {
+    "scene_index": 1,
+    "text": "Mountain peaks glowing with golden morning light",
+    "visual_hint": "snow mountain peaks golden hour",
+    "duration": 4.0
+  },
+  {
+    "scene_index": 2,
+    "text": "Pine forest canopy in gentle wind",
+    "visual_hint": "evergreen pine trees aerial forest",
+    "duration": 4.0
+  }
+]

@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 # Version constants
 PIPELINE_VERSION = "1.0.0"
-ENGINE_VERSION = "incubrix-broll-engine-v1"
+ENGINE_VERSION = "broll-studio-engine-v1"
 
 
 class ManifestBuilder:

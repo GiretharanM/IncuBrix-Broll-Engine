@@ -1,0 +1,501 @@
+version: 2.0.0
+total_tests: 37
+split_summary:
+  train: 24
+  held_out: 13
+  train_ratio: 0.65
+  held_out_ratio: 0.35
+tests:
+- id: script_01_tutorial
+  category: script
+  split: train
+  input_type: script
+  file: scripts/script_01_tutorial.txt
+  aspect_ratios:
+  - '16:9'
+  expected_outcome: success
+  checks:
+  - ffprobe_valid
+  - faststart_moov_before_mdat
+  - no_repeat_clips
+  - duration_sync_100ms
+- id: script_02_news
+  category: script
+  split: train
+  input_type: script
+  file: scripts/script_02_news.txt
+  aspect_ratios:
+  - '16:9'
+  expected_outcome: success
+  checks:
+  - ffprobe_valid
+  - faststart_moov_before_mdat
+  - no_repeat_clips
+  - duration_sync_100ms
+- id: script_03_promo
+  category: script
+  split: held_out
+  input_type: script
+  file: scripts/script_03_promo.txt
+  aspect_ratios:
+  - '9:16'
+  expected_outcome: success
+  checks:
+  - ffprobe_valid
+  - faststart_moov_before_mdat
+  - no_repeat_clips
+  - duration_sync_100ms
+- id: script_04_story
+  category: script
+  split: train
+  input_type: script
+  file: scripts/script_04_story.txt
+  aspect_ratios:
+  - '16:9'
+  expected_outcome: success
+  checks:
+  - ffprobe_valid
+  - faststart_moov_before_mdat
+  - no_repeat_clips
+  - duration_sync_100ms
+- id: script_05_finance
+  category: script
+  split: held_out
+  input_type: script
+  file: scripts/script_05_finance.txt
+  aspect_ratios:
+  - '1:1'
+  expected_outcome: success
+  checks:
+  - ffprobe_valid
+  - faststart_moov_before_mdat
+  - no_repeat_clips
+  - duration_sync_100ms
+- id: script_06_health
+  category: script
+  split: train
+  input_type: script
+  file: scripts/script_06_health.txt
+  aspect_ratios:
+  - '16:9'
+  expected_outcome: success
+  checks:
+  - ffprobe_valid
+  - faststart_moov_before_mdat
+  - no_repeat_clips
+  - duration_sync_100ms
+- id: script_07_travel
+  category: script
+  split: held_out
+  input_type: script
+  file: scripts/script_07_travel.txt
+  aspect_ratios:
+  - '9:16'
+  expected_outcome: success
+  checks:
+  - ffprobe_valid
+  - faststart_moov_before_mdat
+  - no_repeat_clips
+  - duration_sync_100ms
+- id: script_08_tech
+  category: script
+  split: train
+  input_type: script
+  file: scripts/script_08_tech.txt
+  aspect_ratios:
+  - '16:9'
+  expected_outcome: success
+  checks:
+  - ffprobe_valid
+  - faststart_moov_before_mdat
+  - no_repeat_clips
+  - duration_sync_100ms
+- id: script_09_abstract
+  category: script
+  split: held_out
+  input_type: script
+  file: scripts/script_09_abstract.txt
+  aspect_ratios:
+  - '1:1'
+  expected_outcome: success
+  checks:
+  - ffprobe_valid
+  - faststart_moov_before_mdat
+  - no_repeat_clips
+  - duration_sync_100ms
+- id: script_10_stats
+  category: script
+  split: train
+  input_type: script
+  file: scripts/script_10_stats.txt
+  aspect_ratios:
+  - '16:9'
+  expected_outcome: success
+  checks:
+  - ffprobe_valid
+  - faststart_moov_before_mdat
+  - no_repeat_clips
+  - duration_sync_100ms
+- id: script_11_double_meaning
+  category: script
+  split: held_out
+  input_type: script
+  file: scripts/script_11_double_meaning.txt
+  aspect_ratios:
+  - '16:9'
+  expected_outcome: success
+  checks:
+  - ffprobe_valid
+  - faststart_moov_before_mdat
+  - no_repeat_clips
+  - duration_sync_100ms
+  semantic_checks:
+  - bank_not_cash
+  - cloud_not_sky
+  - python_not_snake
+  - mouse_not_rodent
+- id: script_12_named_entity
+  category: script
+  split: train
+  input_type: script
+  file: scripts/script_12_named_entity.txt
+  aspect_ratios:
+  - '9:16'
+  expected_outcome: success_with_warning
+  checks:
+  - ffprobe_valid
+  - faststart_moov_before_mdat
+  - no_repeat_clips
+  - duration_sync_100ms
+  expected_warning: NAMED_ENTITY_SUBSTITUTED
+- id: vo_01_tech_en
+  category: voiceover
+  split: train
+  input_type: audio
+  file: audio/vo_01_tech_en.mp3
+  voice: en-US-Standard
+  language: en
+  aspect_ratios:
+  - '16:9'
+  expected_outcome: success
+  checks:
+  - ffprobe_valid
+  - faststart_moov_before_mdat
+  - duration_sync_100ms
+  - no_repeat_clips
+- id: vo_02_health_hi
+  category: voiceover
+  split: train
+  input_type: audio
+  file: audio/vo_02_health_hi.wav
+  voice: hi-IN-Standard
+  language: hi
+  aspect_ratios:
+  - '16:9'
+  expected_outcome: success
+  checks:
+  - ffprobe_valid
+  - faststart_moov_before_mdat
+  - duration_sync_100ms
+  - no_repeat_clips
+- id: vo_03_travel_ta
+  category: voiceover
+  split: held_out
+  input_type: audio
+  file: audio/vo_03_travel_ta.m4a
+  voice: ta-IN-Standard
+  language: ta
+  aspect_ratios:
+  - '9:16'
+  expected_outcome: success
+  checks:
+  - ffprobe_valid
+  - faststart_moov_before_mdat
+  - duration_sync_100ms
+  - no_repeat_clips
+- id: vo_04_finance_en
+  category: voiceover
+  split: held_out
+  input_type: audio
+  file: audio/vo_04_finance_en.wav
+  voice: en-US-Standard
+  language: en
+  aspect_ratios:
+  - '1:1'
+  expected_outcome: success
+  checks:
+  - ffprobe_valid
+  - faststart_moov_before_mdat
+  - duration_sync_100ms
+  - no_repeat_clips
+- id: vo_05_story_hi
+  category: voiceover
+  split: train
+  input_type: audio
+  file: audio/vo_05_story_hi.mp3
+  voice: hi-IN-Neural
+  language: hi
+  aspect_ratios:
+  - '16:9'
+  expected_outcome: success
+  checks:
+  - ffprobe_valid
+  - faststart_moov_before_mdat
+  - duration_sync_100ms
+  - no_repeat_clips
+- id: vo_06_tutorial_ta
+  category: voiceover
+  split: train
+  input_type: audio
+  file: audio/vo_06_tutorial_ta.wav
+  voice: ta-IN-Neural
+  language: ta
+  aspect_ratios:
+  - '16:9'
+  expected_outcome: success
+  checks:
+  - ffprobe_valid
+  - faststart_moov_before_mdat
+  - duration_sync_100ms
+  - no_repeat_clips
+- id: vo_07_news_en
+  category: voiceover
+  split: held_out
+  input_type: audio
+  file: audio/vo_07_news_en.m4a
+  voice: en-US-Neural
+  language: en
+  aspect_ratios:
+  - '16:9'
+  expected_outcome: success
+  checks:
+  - ffprobe_valid
+  - faststart_moov_before_mdat
+  - duration_sync_100ms
+  - no_repeat_clips
+- id: vo_08_long_5min
+  category: voiceover
+  split: train
+  input_type: audio
+  file: audio/vo_08_long_5min.mp3
+  voice: en-US-Standard
+  language: en
+  aspect_ratios:
+  - '16:9'
+  expected_outcome: success
+  checks:
+  - ffprobe_valid
+  - faststart_moov_before_mdat
+  - duration_sync_100ms
+  - no_repeat_clips
+- id: prompt_01_cat_walking
+  category: quick_prompt
+  split: train
+  input_type: prompt
+  prompt: cat walking
+  duration_seconds: 12
+  narration: false
+  aspect_ratios:
+  - '16:9'
+  expected_outcome: success
+  checks:
+  - ffprobe_valid
+  - duration_matches_requested
+  - faststart_moov_before_mdat
+  - no_repeat_clips
+- id: prompt_02_ocean_waves
+  category: quick_prompt
+  split: train
+  input_type: prompt
+  prompt: ocean waves
+  duration_seconds: 12
+  narration: false
+  aspect_ratios:
+  - '16:9'
+  expected_outcome: success
+  checks:
+  - ffprobe_valid
+  - duration_matches_requested
+  - faststart_moov_before_mdat
+  - no_repeat_clips
+- id: prompt_03_city_night
+  category: quick_prompt
+  split: held_out
+  input_type: prompt
+  prompt: busy city night
+  duration_seconds: 12
+  narration: false
+  aspect_ratios:
+  - '9:16'
+  expected_outcome: success
+  checks:
+  - ffprobe_valid
+  - duration_matches_requested
+  - faststart_moov_before_mdat
+  - no_repeat_clips
+- id: prompt_04_coffee_pouring
+  category: quick_prompt
+  split: train
+  input_type: prompt
+  prompt: coffee pouring
+  duration_seconds: 12
+  narration: false
+  aspect_ratios:
+  - '1:1'
+  expected_outcome: success
+  checks:
+  - ffprobe_valid
+  - duration_matches_requested
+  - faststart_moov_before_mdat
+  - no_repeat_clips
+- id: prompt_05_python_code
+  category: quick_prompt
+  split: held_out
+  input_type: prompt
+  prompt: python code on screen
+  duration_seconds: 12
+  narration: false
+  aspect_ratios:
+  - '16:9'
+  expected_outcome: success
+  checks:
+  - ffprobe_valid
+  - duration_matches_requested
+  - faststart_moov_before_mdat
+  - no_repeat_clips
+- id: prompt_06_sunrise_mountains
+  category: quick_prompt
+  split: train
+  input_type: prompt
+  prompt: sunrise over mountains
+  duration_seconds: 12
+  narration: false
+  aspect_ratios:
+  - '16:9'
+  expected_outcome: success
+  checks:
+  - ffprobe_valid
+  - duration_matches_requested
+  - faststart_moov_before_mdat
+  - no_repeat_clips
+- id: edge_01_sad_news
+  category: edge_case
+  split: held_out
+  input_type: script
+  file: edge_cases/edge_01_sad_news.txt
+  aspect_ratios:
+  - '16:9'
+  expected_outcome: success
+  checks:
+  - respectful_medical_coverage
+  - no_violent_footage
+- id: edge_02_extreme_crop_9x16
+  category: edge_case
+  split: train
+  input_type: script
+  file: edge_cases/edge_02_extreme_crop_9x16.txt
+  aspect_ratios:
+  - '9:16'
+  expected_outcome: success
+  checks:
+  - ffprobe_1080x1920
+  - saliency_crop_applied
+- id: edge_03_scene_list
+  category: edge_case
+  split: train
+  input_type: scenes
+  file: edge_cases/edge_03_scene_list.json
+  aspect_ratios:
+  - '16:9'
+  expected_outcome: success
+  checks:
+  - scene_duration_respected
+  - visual_hints_matched
+- id: edge_04_same_script_diff_voice_a
+  category: edge_case
+  split: held_out
+  input_type: script
+  file: edge_cases/edge_04_same_script_voice_a.txt
+  voice: en-US-Standard
+  aspect_ratios:
+  - '16:9'
+  expected_outcome: success
+  checks:
+  - distinct_cache_hash_from_pair_b
+- id: edge_04_same_script_diff_voice_b
+  category: edge_case
+  split: held_out
+  input_type: script
+  file: edge_cases/edge_04_same_script_voice_b.txt
+  voice: en-US-Neural
+  aspect_ratios:
+  - '16:9'
+  expected_outcome: success
+  checks:
+  - distinct_cache_hash_from_pair_a
+- id: fail_01_silent
+  category: failure_case
+  split: train
+  input_type: audio
+  file: failures/fail_01_silent.wav
+  prompt: null
+  expected_outcome: expected_error
+  expected_error_code: SILENT_AUDIO_DETECTED
+  checks:
+  - error_code_matches
+  - status_code_matches
+- id: fail_02_music_only
+  category: failure_case
+  split: train
+  input_type: audio
+  file: failures/fail_02_music_only.wav
+  prompt: null
+  expected_outcome: expected_error
+  expected_error_code: MUSIC_ONLY_AUDIO_DETECTED
+  checks:
+  - error_code_matches
+  - status_code_matches
+- id: fail_03_corrupted
+  category: failure_case
+  split: train
+  input_type: audio
+  file: failures/fail_03_corrupted.mp3
+  prompt: null
+  expected_outcome: expected_error
+  expected_error_code: CORRUPTED_DOWNLOAD
+  checks:
+  - error_code_matches
+  - status_code_matches
+- id: fail_04_wrong_type
+  category: failure_case
+  split: train
+  input_type: audio
+  file: failures/fail_04_wrong_type.pdf
+  prompt: null
+  expected_outcome: expected_error
+  expected_error_code: INVALID_FILE_TYPE
+  checks:
+  - error_code_matches
+  - status_code_matches
+- id: fail_05_empty_script
+  category: failure_case
+  split: train
+  input_type: script
+  file: failures/fail_05_empty_script.txt
+  prompt: null
+  expected_outcome: expected_error
+  expected_error_code: EMPTY_SCRIPT
+  checks:
+  - error_code_matches
+  - status_code_matches
+- id: fail_06_empty_prompt
+  category: failure_case
+  split: train
+  input_type: prompt
+  file: null
+  prompt: '   '
+  expected_outcome: expected_error
+  expected_error_code: PROMPT_EMPTY
+  checks:
+  - error_code_matches
+  - status_code_matches

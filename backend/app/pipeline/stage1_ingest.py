@@ -80,10 +80,21 @@ class IngestValidator:
                         for i in range(0, len(total_samples), channels)
                     ]
         except wave.Error:
-            # If compressed format (mp3/m4a) not openable via wave, estimate from size or assume standard
-            file_size = os.path.getsize(file_path)
-            # Estimate ~16KB/s for 128kbps mp3
-            duration_seconds = max(1.0, min(600.0, file_size / 16000.0))
+            # Check compressed format with ffprobe to catch corrupted files
+            from app.pipeline.stage7_normalize import find_ffmpeg_binary
+            from app.errors import CorruptedDownloadException
+            import subprocess, json
+            ffp = find_ffmpeg_binary("ffprobe")
+            cmd = [ffp, "-v", "error", "-show_entries", "format=duration", "-of", "json", file_path]
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if res.returncode != 0:
+                raise CorruptedDownloadException(url=file_path)
+            try:
+                data = json.loads(res.stdout)
+                duration_seconds = float(data.get("format", {}).get("duration", 0.0))
+            except Exception:
+                raise CorruptedDownloadException(url=file_path)
+
             if duration_seconds > self.max_duration_seconds:
                 raise AudioTooLongException(duration_seconds=duration_seconds, max_seconds=self.max_duration_seconds)
             return {

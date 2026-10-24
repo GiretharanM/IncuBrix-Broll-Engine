@@ -19,6 +19,7 @@ AsyncSessionLocal = async_sessionmaker(
     expire_on_commit=False,
     autoflush=False
 )
+async_session_factory = AsyncSessionLocal
 
 # Sync Engine for Celery tasks and scripts
 sync_engine = create_engine(

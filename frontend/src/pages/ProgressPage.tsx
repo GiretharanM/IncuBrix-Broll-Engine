@@ -9,7 +9,6 @@ import {
   Search,
   SlidersHorizontal,
   Layers,
-  FileCheck2,
 } from 'lucide-react'
 import { Job } from '../types'
 import { api } from '../api'
@@ -80,14 +79,41 @@ export const ProgressPage: React.FC<ProgressPageProps> = ({
       thresholdProgress: 90,
       icon: <Film className="w-4 h-4" />,
     },
+  ]
+
+  const promptSteps: PipelineStep[] = [
     {
-      id: 7,
-      name: 'Render & Captions Delivery',
-      description: 'Concat demuxer, narration overlay, ASS burn-in rendering, and timeline/manifest compilation.',
+      id: 1,
+      name: 'Understanding your idea',
+      description: 'Analyzing prompt semantic intent, language detection, and content safety verification.',
+      thresholdProgress: 25,
+      icon: <Search className="w-4 h-4" />,
+    },
+    {
+      id: 2,
+      name: 'Planning scenes',
+      description: 'Expanding idea into varied camera angles, shot types, and 3-tier cascading search queries.',
+      thresholdProgress: 50,
+      icon: <Layers className="w-4 h-4" />,
+    },
+    {
+      id: 3,
+      name: 'Finding footage for scenes',
+      description: 'Searching Pixabay & authentic catalogs with zero-reuse allocation and relevance threshold.',
+      thresholdProgress: 75,
+      icon: <SlidersHorizontal className="w-4 h-4" />,
+    },
+    {
+      id: 4,
+      name: 'Rendering',
+      description: 'Normalising resolution, 30fps timing lock, ambient soundtrack muxing, and manifest generation.',
       thresholdProgress: 100,
-      icon: <FileCheck2 className="w-4 h-4" />,
+      icon: <Film className="w-4 h-4" />,
     },
   ]
+
+  const isPromptJob = Boolean(job?.prompt)
+  const activeSteps = isPromptJob ? promptSteps : steps
 
   // Timer for elapsed seconds
   useEffect(() => {
@@ -101,6 +127,10 @@ export const ProgressPage: React.FC<ProgressPageProps> = ({
   useEffect(() => {
     let active = true
 
+    if (!jobId || jobId === 'job-demo-84920') {
+      return
+    }
+
     const fetchStatus = async () => {
       try {
         const data = await api.getJob(jobId)
@@ -108,9 +138,13 @@ export const ProgressPage: React.FC<ProgressPageProps> = ({
 
         setJob(data)
 
-        if (data.status === 'succeeded' || data.progress >= 100) {
+        if (data.status === 'succeeded') {
           setIsPolling(false)
           onJobComplete(data)
+          // Automatically transition to Result Studio and autoplay
+          setTimeout(() => {
+            onNavigateToStudio()
+          }, 800)
         } else if (data.status === 'failed') {
           setIsPolling(false)
         }
@@ -133,8 +167,10 @@ export const ProgressPage: React.FC<ProgressPageProps> = ({
     }
   }, [jobId, isPolling])
 
-  const progress = job?.progress || Math.min(100, Math.floor(elapsedSeconds * 8))
-  const isComplete = job?.status === 'succeeded' || progress >= 100
+  const progress = job?.progress !== undefined && job?.progress !== null
+    ? job.progress
+    : Math.min(90, Math.floor(elapsedSeconds * 4))
+  const isComplete = job?.status === 'succeeded'
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
@@ -226,7 +262,7 @@ export const ProgressPage: React.FC<ProgressPageProps> = ({
         </h2>
 
         <div className="flex flex-col gap-4">
-          {steps.map(step => {
+          {activeSteps.map(step => {
             const isStepDone = progress >= step.thresholdProgress
             const isStepActive = progress < step.thresholdProgress && progress >= step.thresholdProgress - 15
 

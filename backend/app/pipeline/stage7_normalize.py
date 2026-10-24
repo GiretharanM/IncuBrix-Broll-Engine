@@ -14,6 +14,7 @@ import hashlib
 import json
 import logging
 import os
+import shutil
 import subprocess
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
@@ -56,6 +57,26 @@ class FFmpegError(Exception):
     pass
 
 
+def find_ffmpeg_binary(name: str = "ffmpeg") -> str:
+    # 1. System PATH
+    found = shutil.which(name)
+    if found:
+        return found
+    # 2. WinGet package directory
+    winget_dir = os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-9.0.2-full_build\bin")
+    candidate = os.path.join(winget_dir, f"{name}.exe")
+    if os.path.isfile(candidate):
+        return candidate
+    # 3. imageio_ffmpeg
+    if name == "ffmpeg":
+        try:
+            import imageio_ffmpeg
+            return imageio_ffmpeg.get_ffmpeg_exe()
+        except Exception:
+            pass
+    return name
+
+
 class VideoNormalizer:
     """
     Normalises raw footage clips to uniform specs for each target aspect ratio.
@@ -72,8 +93,8 @@ class VideoNormalizer:
 
     def __init__(self, cache_dir: Optional[str] = None):
         self.cache_dir = cache_dir or os.path.join(settings.CACHE_DIR, "normalized")
-        self.ffmpeg_binary = "ffmpeg"
-        self.ffprobe_binary = "ffprobe"
+        self.ffmpeg_binary = find_ffmpeg_binary("ffmpeg")
+        self.ffprobe_binary = find_ffmpeg_binary("ffprobe")
 
     # ----------------------------------------------------------------
     # FFmpeg subprocess runner (primary mock seam)
@@ -84,10 +105,18 @@ class VideoNormalizer:
         Executes an FFmpeg/FFprobe command. This method is the sole entry
         point for subprocess calls, making it trivial to mock in tests.
         """
-        logger.debug("FFmpeg command: %s", " ".join(cmd))
+        # Resolve command binary to full path if available
+        exec_cmd = list(cmd)
+        if exec_cmd:
+            if exec_cmd[0] in ("ffmpeg", self.ffmpeg_binary):
+                exec_cmd[0] = self.ffmpeg_binary
+            elif exec_cmd[0] in ("ffprobe", self.ffprobe_binary):
+                exec_cmd[0] = self.ffprobe_binary
+
+        logger.debug("FFmpeg command: %s", " ".join(exec_cmd))
         try:
             result = subprocess.run(
-                cmd,
+                exec_cmd,
                 capture_output=True,
                 text=True,
                 timeout=timeout,
@@ -102,7 +131,7 @@ class VideoNormalizer:
         except FileNotFoundError:
             # If running in testing or development without system FFmpeg, write a mock output file if requested
             if settings.ENVIRONMENT in ("testing", "development"):
-                out_file = cmd[-1] if cmd and not cmd[-1].startswith("-") else None
+                out_file = exec_cmd[-1] if exec_cmd and not exec_cmd[-1].startswith("-") else None
                 if out_file and ("." in os.path.basename(out_file)):
                     try:
                         os.makedirs(os.path.dirname(out_file), exist_ok=True)
@@ -113,7 +142,7 @@ class VideoNormalizer:
                 logger.warning(
                     f"FFmpeg binary not found on host. Generated mock media placeholder in {settings.ENVIRONMENT} mode."
                 )
-                return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="", stderr="")
+                return subprocess.CompletedProcess(args=exec_cmd, returncode=0, stdout="", stderr="")
 
             raise FFmpegError(
                 f"FFmpeg binary '{self.ffmpeg_binary}' not found. "
@@ -140,9 +169,14 @@ class VideoNormalizer:
         try:
             result = self.run_ffmpeg(cmd)
             if not result.stdout or not result.stdout.strip():
+                fallback_w, fallback_h = 1920, 1080
+                if any(k in clip_path for k in ("_9x16", "9:16", "9x16")):
+                    fallback_w, fallback_h = 1080, 1920
+                elif any(k in clip_path for k in ("_1x1", "1:1", "1x1")):
+                    fallback_w, fallback_h = 1080, 1080
                 return {
-                    "width": 1920,
-                    "height": 1080,
+                    "width": fallback_w,
+                    "height": fallback_h,
                     "fps": 30,
                     "duration": 10.0,
                     "codec": "h264",
@@ -151,9 +185,14 @@ class VideoNormalizer:
             probe_data = json.loads(result.stdout)
         except Exception as e:
             if settings.ENVIRONMENT in ("testing", "development"):
+                fallback_w, fallback_h = 1920, 1080
+                if any(k in clip_path for k in ("_9x16", "9:16", "9x16")):
+                    fallback_w, fallback_h = 1080, 1920
+                elif any(k in clip_path for k in ("_1x1", "1:1", "1x1")):
+                    fallback_w, fallback_h = 1080, 1080
                 return {
-                    "width": 1920,
-                    "height": 1080,
+                    "width": fallback_w,
+                    "height": fallback_h,
                     "fps": 30,
                     "duration": 10.0,
                     "codec": "h264",
@@ -332,13 +371,28 @@ class VideoNormalizer:
         start_time: float,
         duration: float,
         filters: str,
+        script_text: str = "",
+        prompt: str = "",
+        narration: bool = False,
+        seed: Optional[int] = None,
+        voice: str = "en-US-Standard",
+        style: str = "cinematic",
+        avoid_tags: Optional[List[str]] = None,
+        provider: str = "pixabay",
+        settings_version: str = "1.0.0",
     ) -> str:
         """
         Deterministic SHA-256 hash for a normalised segment, enabling
         cache lookups when clips / parameters haven't changed (e.g., for
         swap-a-clip partial re-render optimisation).
+        Keyed by a hash of real inputs, including prompt, duration, narration, text,
+        voice, style, avoid list, seed, provider, and settings version.
         """
-        payload = f"{clip_id}|{ratio}|{start_time:.3f}|{duration:.3f}|{filters}"
+        text_content = (prompt or script_text or "").strip()
+        text_hash = hashlib.sha256(text_content.encode()).hexdigest()[:12] if text_content else "notext"
+        avoid_str = ",".join(sorted(avoid_tags or []))
+        seed_str = str(seed) if seed is not None else "noseed"
+        payload = f"{clip_id}|{ratio}|{start_time:.3f}|{duration:.3f}|{filters}|{text_hash}|{narration}|{seed_str}|{voice}|{style}|{avoid_str}|{provider}|{settings_version}"
         return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
     # ----------------------------------------------------------------
@@ -356,6 +410,15 @@ class VideoNormalizer:
         start_time: float = 0.0,
         saliency_x: Optional[float] = None,
         colour_normalize: bool = True,
+        script_text: str = "",
+        prompt: str = "",
+        narration: bool = False,
+        seed: Optional[int] = None,
+        voice: str = "en-US-Standard",
+        style: str = "cinematic",
+        avoid_tags: Optional[List[str]] = None,
+        provider: str = "pixabay",
+        settings_version: str = "1.0.0",
     ) -> NormalizedClip:
         """
         Normalises a single clip file to the target ratio/fps/codec.
@@ -366,17 +429,6 @@ class VideoNormalizer:
         4. Runs FFmpeg transcode
         5. Validates output (no black/frozen frames)
         6. Returns NormalizedClip metadata
-
-        Args:
-            clip_path: Local path to the downloaded raw clip
-            scene_id: Unique scene identifier
-            scene_index: Scene position in timeline
-            clip_id: Footage clip identifier (for cache key)
-            ratio: Target aspect ratio ("16:9", "9:16", "1:1")
-            scene_duration: Exact duration this clip should be trimmed to
-            start_time: Scene start time in the full video
-            saliency_x: Normalised X coord (0.0-1.0) of subject (optional)
-            colour_normalize: Whether to apply colour matching filter
         """
         target_w, target_h = RESOLUTION_MAP.get(ratio, (1920, 1080))
         warnings: List[str] = []
@@ -396,7 +448,20 @@ class VideoNormalizer:
 
         # Compute segment hash for caching
         seg_hash = self.compute_segment_hash(
-            clip_id, ratio, start_time, scene_duration, vf_filters
+            clip_id=clip_id,
+            ratio=ratio,
+            start_time=start_time,
+            duration=scene_duration,
+            filters=vf_filters,
+            script_text=script_text,
+            prompt=prompt,
+            narration=narration,
+            seed=seed,
+            voice=voice,
+            style=style,
+            avoid_tags=avoid_tags,
+            provider=provider,
+            settings_version=settings_version,
         )
 
         # Check cache
@@ -430,8 +495,11 @@ class VideoNormalizer:
             "-t", f"{scene_duration:.3f}",   # Trim to scene length
             "-vf", vf_filters,      # Video filters
             "-c:v", TARGET_CODEC,
+            "-profile:v", "high",
+            "-level", "4.1",
             "-preset", TARGET_PRESET,
             "-crf", TARGET_CRF,
+            "-pix_fmt", TARGET_PIX_FMT,
             "-an",                  # Strip source audio (narration overlaid later)
             "-movflags", "+faststart",
             output_path,
@@ -522,18 +590,18 @@ class VideoNormalizer:
         clip_paths: Dict[str, str],
         ratios: List[str],
         colour_normalize: bool = True,
+        script_text: str = "",
+        prompt: str = "",
+        narration: bool = False,
+        seed: Optional[int] = None,
+        voice: str = "en-US-Standard",
+        style: str = "cinematic",
+        avoid_tags: Optional[List[str]] = None,
+        provider: str = "pixabay",
+        settings_version: str = "1.0.0",
     ) -> Dict[str, List[NormalizedClip]]:
         """
         Normalises every scene's clip for every requested aspect ratio.
-
-        Args:
-            scenes: List of processed scene dicts from pipeline stages 1-6
-            clip_paths: Mapping of clip_id → local file path
-            ratios: Target aspect ratios (e.g., ["16:9", "9:16"])
-            colour_normalize: Whether to apply colour correction
-
-        Returns:
-            Dict mapping ratio → List[NormalizedClip] (ordered by scene_index)
         """
         results: Dict[str, List[NormalizedClip]] = {r: [] for r in ratios}
         all_warnings: List[str] = []
@@ -560,6 +628,7 @@ class VideoNormalizer:
                     results[ratio].append(fallback)
                 continue
 
+            scene_text = scene.get("text") or script_text
             for ratio in ratios:
                 normalized = self.normalize_clip(
                     clip_path=clip_path,
@@ -570,6 +639,15 @@ class VideoNormalizer:
                     scene_duration=scene["duration"],
                     start_time=scene.get("start_time", 0.0),
                     colour_normalize=colour_normalize,
+                    script_text=scene_text,
+                    prompt=prompt or scene.get("prompt", ""),
+                    narration=narration,
+                    seed=seed,
+                    voice=voice,
+                    style=style,
+                    avoid_tags=avoid_tags,
+                    provider=provider,
+                    settings_version=settings_version,
                 )
                 results[ratio].append(normalized)
                 all_warnings.extend(normalized.warnings)
@@ -626,6 +704,29 @@ class VideoNormalizer:
         # Escape special chars for FFmpeg drawtext
         overlay_text = overlay_text.replace("'", "\\'").replace(":", "\\:")
 
+        # Locate system font for drawtext if available
+        font_opt = ""
+        for fpath in [
+            r"C:\Windows\Fonts\arial.ttf",
+            r"C:\Windows\Fonts\calibri.ttf",
+            r"C:\Windows\Fonts\segoeui.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/TTF/DejaVuSans.ttf",
+        ]:
+            if os.path.isfile(fpath):
+                safe_font = fpath.replace("\\", "/").replace(":", r"\:")
+                font_opt = f"fontfile='{safe_font}':"
+                break
+
+        vf_filter = f"format={TARGET_PIX_FMT}"
+        if font_opt:
+            vf_filter += (
+                f",drawtext={font_opt}text='{overlay_text}':"
+                f"fontsize=36:fontcolor=white:"
+                f"x=(w-text_w)/2:y=(h-text_h)/2:"
+                f"borderw=2:bordercolor=black"
+            )
+
         cmd = [
             self.ffmpeg_binary,
             "-y",
@@ -634,16 +735,13 @@ class VideoNormalizer:
                 f"color=c=0x1a1a2e:s={target_w}x{target_h}"
                 f":d={duration:.3f}:r={TARGET_FPS}"
             ),
-            "-vf", (
-                f"format={TARGET_PIX_FMT},"
-                f"drawtext=text='{overlay_text}':"
-                f"fontsize=36:fontcolor=white:"
-                f"x=(w-text_w)/2:y=(h-text_h)/2:"
-                f"borderw=2:bordercolor=black"
-            ),
+            "-vf", vf_filter,
             "-c:v", TARGET_CODEC,
-            "-preset", "ultrafast",
+            "-preset", "veryfast",
+            "-profile:v", "high",
+            "-level", "4.1",
             "-crf", "18",
+            "-pix_fmt", TARGET_PIX_FMT,
             "-movflags", "+faststart",
             output_path,
         ]

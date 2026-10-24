@@ -128,6 +128,35 @@ class IdempotencyConflictException(AppException):
             details={"idempotency_key": key},
         )
 
+class PromptEmptyException(AppException):
+    def __init__(self):
+        super().__init__(
+            code="PROMPT_EMPTY",
+            message="The provided prompt is empty or whitespace-only. Please provide a descriptive idea (e.g. 'cat walking').",
+            status_code=400,
+            retryable=False,
+        )
+
+class PromptTooLongException(AppException):
+    def __init__(self, length: int, max_length: int = 500):
+        super().__init__(
+            code="PROMPT_TOO_LONG",
+            message=f"Prompt length ({length} characters) exceeds the maximum allowed limit of {max_length} characters.",
+            status_code=400,
+            retryable=False,
+            details={"length": length, "max_length": max_length},
+        )
+
+class PromptNotAllowedException(AppException):
+    def __init__(self, reason: str = "Prompt violates safety and content moderation policy."):
+        super().__init__(
+            code="PROMPT_NOT_ALLOWED",
+            message=f"This prompt cannot be processed: {reason}",
+            status_code=422,
+            retryable=False,
+            details={"reason": reason},
+        )
+
 class StorageUnavailableException(AppException):
     def __init__(self, message: str = "MinIO storage service unavailable"):
         super().__init__(

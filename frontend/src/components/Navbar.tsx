@@ -49,7 +49,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           role="button"
           tabIndex={0}
           onKeyDown={e => e.key === 'Enter' && onSelectTab('new')}
-          aria-label="IncuBrix B-roll Engine Home"
+          aria-label="Broll Studio Home"
         >
           <div className="p-2 bg-gradient-to-tr from-emerald-600 to-teal-500 rounded-xl text-slate-950 shadow-lg shadow-emerald-500/25 group-hover:scale-105 transition-transform">
             <Video className="w-5 h-5 stroke-[2.5]" />
@@ -57,10 +57,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <span className="font-extrabold text-base tracking-tight text-white dark:text-white">
-                IncuBrix
+                Broll Studio
               </span>
               <span className="px-1.5 py-0.5 text-[10px] font-bold tracking-wider uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-md">
-                B-Roll Engine
+                AI Engine
               </span>
             </div>
             <p className="text-[11px] text-slate-400 font-medium">Commercial Clean • Frame Accurate</p>

@@ -1,0 +1,9 @@
+{
+  "script_text": "Healthy habits help us live a better life. Eating fresh fruits and vegetables gives our body essential nutrients. Regular exercise keeps us fit, while proper sleep improves our energy and concentration.",
+  "voice": "en-US-Standard",
+  "aspect_ratios": ["16:9"],
+  "style": "documentary",
+  "avoid": ["violence"],
+  "burn_in_captions": true,
+  "srt_captions": true
+}

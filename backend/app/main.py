@@ -37,6 +37,16 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"MinIO bucket check deferred: {e}")
 
+    # Log active footage providers
+    active_providers_list = []
+    if settings.PIXABAY_API_KEY and not settings.PIXABAY_API_KEY.startswith("mock"):
+        active_providers_list.append("pixabay")
+    if settings.PEXELS_API_KEY and not settings.PEXELS_API_KEY.startswith("mock"):
+        active_providers_list.append("pexels")
+    if settings.FOOTAGE_ADAPTER == "mock" or not active_providers_list:
+        active_providers_list.append("mock")
+    logger.info(f"Active footage providers configured: {', '.join(active_providers_list)}")
+
     yield
 
     logger.info("Shutting down IncuBrix B-roll Engine Service...")
@@ -118,12 +128,36 @@ async def ready():
 
     is_ready = postgres_ok or settings.ENVIRONMENT == "development"
 
+    pixabay_active = bool(settings.PIXABAY_API_KEY and not settings.PIXABAY_API_KEY.startswith("mock"))
+    pexels_active = bool(settings.PEXELS_API_KEY and not settings.PEXELS_API_KEY.startswith("mock"))
+    mock_active = settings.FOOTAGE_ADAPTER == "mock" or (not pixabay_active and not pexels_active)
+
+    providers_status = {
+        "pixabay": pixabay_active,
+        "pexels": pexels_active,
+        "mock": mock_active,
+    }
+
     return ReadyResponse(
         status="ready" if is_ready else "not_ready",
         postgres=postgres_ok,
         redis=redis_ok,
         minio=minio_ok,
+        providers=providers_status,
     )
 
 # Mount API Routers
 app.include_router(jobs_router, prefix="/api/v1")
+
+# Mount test pack static directory if available
+import os
+from starlette.staticfiles import StaticFiles
+if os.path.exists("test_pack"):
+    app.mount("/test_pack", StaticFiles(directory="test_pack"), name="test_pack")
+
+# Mount production frontend SPA
+dist_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"))
+if os.path.exists(dist_dir):
+    app.mount("/", StaticFiles(directory=dist_dir, html=True), name="frontend")
+
+

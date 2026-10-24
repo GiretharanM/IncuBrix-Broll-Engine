@@ -41,16 +41,16 @@ class MultiLingualTTSAdapter(BaseTTSAdapter):
         if os.path.exists(output_path):
             return output_path
 
-        # Try gTTS if installed and online
-        try:
-            from gtts import gTTS
-            tts = gTTS(text=clean_text, lang=lang, slow=False)
-            mp3_path = output_path.replace(".wav", ".mp3")
-            tts.save(mp3_path)
-            return mp3_path
-        except Exception:
-            # High-fidelity synthetic fallback with language-specific cadence
-            pass
+        # Try gTTS only if explicitly requested via environment variable
+        if os.environ.get("USE_GTTS"):
+            try:
+                from gtts import gTTS
+                tts = gTTS(text=clean_text, lang=lang, slow=False)
+                mp3_path = output_path.replace(".wav", ".mp3")
+                tts.save(mp3_path)
+                return mp3_path
+            except Exception:
+                pass
 
         return self._synthesize_synthetic_pcm(clean_text, output_path, pitch=pitch, lang=lang)
 
@@ -90,6 +90,50 @@ class MultiLingualTTSAdapter(BaseTTSAdapter):
             wav_file.writeframes(frames)
 
         logger.info(f"Synthesized TTS audio: {output_path} ({duration_seconds:.2f}s, voice={lang})")
+        return output_path
+
+    def synthesize_ambient(self, duration_seconds: float) -> str:
+        """
+        Synthesizes a soft, harmonic ambient audio track in pure 16-bit PCM WAV.
+        Used when narration=False.
+        """
+        output_filename = f"ambient_{int(duration_seconds)}s.wav"
+        output_path = os.path.join(self.output_dir, output_filename)
+        if os.path.exists(output_path):
+            return output_path
+
+        sample_rate = 16000
+        total_samples = int(sample_rate * duration_seconds)
+
+        with wave.open(output_path, "w") as wav_file:
+            wav_file.setnchannels(1)
+            wav_file.setsampwidth(2)
+            wav_file.setframerate(sample_rate)
+
+            frames = bytearray()
+            fade_samples = int(sample_rate * 1.5)
+
+            for i in range(total_samples):
+                t = i / sample_rate
+                # Envelope: fade-in and fade-out
+                amp = 1.0
+                if i < fade_samples:
+                    amp = i / fade_samples
+                elif i > total_samples - fade_samples:
+                    amp = max(0.0, (total_samples - i) / fade_samples)
+
+                # Warm harmonic ambient chord (432Hz root, 324Hz fifth, 216Hz sub)
+                signal = (
+                    0.4 * math.sin(2 * math.pi * 216.0 * t) +
+                    0.3 * math.sin(2 * math.pi * 324.0 * t) +
+                    0.3 * math.sin(2 * math.pi * 432.0 * t)
+                )
+                sample_val = int(amp * signal * 4096)  # Subtle, non-intrusive volume
+                frames.extend(struct.pack("<h", max(-32767, min(32767, sample_val))))
+
+            wav_file.writeframes(frames)
+
+        logger.info(f"Synthesized ambient soundtrack: {output_path} ({duration_seconds:.1f}s)")
         return output_path
 
 tts_adapter = MultiLingualTTSAdapter()

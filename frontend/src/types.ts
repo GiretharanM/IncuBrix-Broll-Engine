@@ -59,6 +59,10 @@ export interface Job {
   style?: string
   script_text?: string
   audio_url?: string
+  prompt?: string
+  duration_seconds?: number
+  narration?: boolean
+  seed?: number
 }
 
 export interface JobListItem {

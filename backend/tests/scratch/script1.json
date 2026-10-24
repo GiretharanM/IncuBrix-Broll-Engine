@@ -1,0 +1,9 @@
+{
+  "script_text": "Robots and artificial intelligence are revolutionizing modern factories. Automated machines increase productivity, while engineers oversee quality control. Together, humans and machines achieve extraordinary results.",
+  "voice": "en-US-Standard",
+  "aspect_ratios": ["16:9"],
+  "style": "cinematic",
+  "avoid": ["watermark"],
+  "burn_in_captions": true,
+  "srt_captions": true
+}

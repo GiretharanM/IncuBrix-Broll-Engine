@@ -22,13 +22,14 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = Field(default="redis://redis:6379/0")
     CELERY_RESULT_BACKEND: str = Field(default="redis://redis:6379/1")
 
-    # MinIO
+    # MinIO / Object Storage
     MINIO_ENDPOINT: str = Field(default="minio:9000")
     MINIO_ROOT_USER: str = Field(default="minioadmin")
     MINIO_ROOT_PASSWORD: str = Field(default="minioadmin")
     MINIO_BUCKET_NAME: str = Field(default="incubrix-media")
     MINIO_USE_SSL: bool = Field(default=False)
     MINIO_PUBLIC_ENDPOINT: str = Field(default="http://localhost:9000")
+    STORAGE_PUBLIC_URL: str = Field(default=os.environ.get("STORAGE_PUBLIC_URL", "http://localhost:8000"))
 
     # Adapters (mock | real)
     STT_ADAPTER: str = Field(default="mock")
@@ -37,7 +38,9 @@ class Settings(BaseSettings):
     FOOTAGE_ADAPTER: str = Field(default="mock")
     VISION_ADAPTER: str = Field(default="mock")
 
-    # External APIs
+    # External APIs and Providers
+    FOOTAGE_PROVIDERS: str = Field(default="pixabay,pexels,mock")
+    SETTINGS_VERSION: str = Field(default="1.0.0")
     PEXELS_API_KEY: Optional[str] = Field(default=None)
     PIXABAY_API_KEY: Optional[str] = Field(default=None)
     OPENAI_API_KEY: Optional[str] = Field(default=None)

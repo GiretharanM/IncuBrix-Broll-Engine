@@ -18,32 +18,71 @@ import {
   Video as VideoIcon,
   Film,
   Zap,
+  AlertTriangle,
 } from 'lucide-react'
 import { Job, SceneCandidate, AspectRatio } from '../types'
-import { api } from '../api'
+import { api, CreateJobPayload } from '../api'
 import { MOCK_CANDIDATES } from '../mockData'
 
 interface ResultStudioPageProps {
   job: Job
   onClipSwapped: (updatedJob: Job, toastMessage: string) => void
+  onRegenerate?: (payload: CreateJobPayload) => void
 }
 
 export const ResultStudioPage: React.FC<ResultStudioPageProps> = ({
   job: initialJob,
   onClipSwapped,
+  onRegenerate,
 }) => {
   const [job, setJob] = useState<Job>(initialJob)
   const [selectedRatio, setSelectedRatio] = useState<AspectRatio>('16:9')
   const [activeSceneIndex, setActiveSceneIndex] = useState(0)
+  const [isRegenerating, setIsRegenerating] = useState(false)
+
+  // Sync state whenever a new job is loaded into the studio
+  useEffect(() => {
+    setJob(initialJob)
+    setActiveSceneIndex(0)
+    setCurrentTime(0)
+    setIsPlaying(true)
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0
+      videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {})
+    }
+  }, [initialJob])
 
   // Player state
-  const [isPlaying, setIsPlaying] = useState(false)
+  const [isPlaying, setIsPlaying] = useState(true)
   const [currentTime, setCurrentTime] = useState(0)
   const [isMuted, setIsMuted] = useState(true)
   const [videoError, setVideoError] = useState(false)
   const [showCaptions, setShowCaptions] = useState(true)
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0)
   const videoRef = useRef<HTMLVideoElement | null>(null)
+
+  const handleRegenerateWithVariation = () => {
+    if (!onRegenerate) return
+    setIsRegenerating(true)
+    const newSeed = Math.floor(Math.random() * 1000000)
+    const newKey = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `key-${Date.now()}`
+    const payload: CreateJobPayload = {
+      prompt: job.prompt,
+      duration_seconds: job.duration_seconds || 20,
+      narration: job.narration || false,
+      seed: newSeed,
+      script_text: !job.prompt ? job.script_text : undefined,
+      audio_url: !job.prompt ? job.audio_url : undefined,
+      voice: job.voice || 'en-US-Standard',
+      aspect_ratios: (job.aspect_ratios as AspectRatio[]) || ['16:9', '9:16', '1:1'],
+      style: job.style || 'cinematic',
+      avoid: ['watermark', 'violence', 'logos'],
+      burn_in_captions: true,
+      srt_captions: true,
+      idempotency_key: newKey,
+    }
+    onRegenerate(payload)
+  }
 
   // Swap Drawer state
   const [isSwapDrawerOpen, setIsSwapDrawerOpen] = useState(() => {
@@ -62,25 +101,53 @@ export const ResultStudioPage: React.FC<ResultStudioPageProps> = ({
   const totalDuration = scenes.reduce((acc, s) => acc + (s.duration || 3.0), 0)
   const currentScene = scenes[activeSceneIndex] || scenes[0]
 
-  // Sync active scene based on video playback currentTime
+  const ratioKey = `video_${selectedRatio.replace(':', 'x')}`
+  const activeVideoSrc =
+    job.result_urls?.[ratioKey] ||
+    job.result_urls?.[selectedRatio] ||
+    job.result_urls?.['16:9'] ||
+    job.result_urls?.['video_16x9'] ||
+    currentScene?.preview_url ||
+    '/videos/healthy_lifestyle.mp4'
+
+  // Continuous Combined Video Playback across all scenes
   useEffect(() => {
     if (!videoRef.current) return
-    const updateTime = () => {
-      if (!videoRef.current) return
-      const t = videoRef.current.currentTime
-      setCurrentTime(t)
+    const v = videoRef.current
 
-      // Find which scene corresponds to time `t`
-      const idx = scenes.findIndex(s => t >= s.start_time && t < s.end_time)
-      if (idx !== -1 && idx !== activeSceneIndex) {
-        setActiveSceneIndex(idx)
+    const handleTimeUpdate = () => {
+      const clipTime = v.currentTime
+      setCurrentTime(clipTime)
+
+      if (scenes.length > 0) {
+        const idx = scenes.findIndex((s, i) => {
+          const nextStart = scenes[i + 1]?.start_time ?? (s.start_time + s.duration)
+          return clipTime >= s.start_time && clipTime < nextStart
+        })
+        if (idx !== -1 && idx !== activeSceneIndex) {
+          setActiveSceneIndex(idx)
+        }
       }
     }
 
-    const v = videoRef.current
-    v.addEventListener('timeupdate', updateTime)
-    return () => v.removeEventListener('timeupdate', updateTime)
+    const handleEnded = () => {
+      setIsPlaying(false)
+    }
+
+    v.addEventListener('timeupdate', handleTimeUpdate)
+    v.addEventListener('ended', handleEnded)
+    return () => {
+      v.removeEventListener('timeupdate', handleTimeUpdate)
+      v.removeEventListener('ended', handleEnded)
+    }
   }, [scenes, activeSceneIndex])
+
+  // Maintain playing state
+  useEffect(() => {
+    if (isPlaying && videoRef.current) {
+      videoRef.current.play().catch(() => {})
+    }
+  }, [isPlaying])
 
   // Play / Pause toggle
   const togglePlay = () => {
@@ -89,8 +156,7 @@ export const ResultStudioPage: React.FC<ResultStudioPageProps> = ({
       videoRef.current.pause()
       setIsPlaying(false)
     } else {
-      videoRef.current.play()
-      setIsPlaying(true)
+      videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {})
     }
   }
 
@@ -102,8 +168,19 @@ export const ResultStudioPage: React.FC<ResultStudioPageProps> = ({
       videoRef.current.currentTime = targetScene.start_time
       setCurrentTime(targetScene.start_time)
       if (!isPlaying) {
-        videoRef.current.play()
-        setIsPlaying(true)
+        videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {})
+      }
+    }
+  }
+
+  // Restart video from beginning (Scene 1)
+  const handleRestart = () => {
+    setActiveSceneIndex(0)
+    setCurrentTime(0)
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0
+      if (!isPlaying) {
+        videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {})
       }
     }
   }
@@ -169,6 +246,19 @@ export const ResultStudioPage: React.FC<ResultStudioPageProps> = ({
     '1:1': 'aspect-square max-w-md',
   }[selectedRatio]
 
+  // Fallback and mock metrics
+  const fallbackScenes = scenes.filter(s =>
+    s.provider === 'generative_fallback' ||
+    s.provider === 'fallback' ||
+    String(s.selected_clip_id || '').includes('fallback') ||
+    Boolean(s.ai_generated) ||
+    s.provider === 'mock'
+  )
+  const fallbackCount = fallbackScenes.length
+  const fallbackPercent = scenes.length > 0 ? (fallbackCount / scenes.length) * 100 : 0
+  const isHighFallback = fallbackPercent > 30 || (job.warnings || []).some(w => w.includes('HIGH_FALLBACK_RATE'))
+  const isMock = scenes.some(s => s.provider === 'mock') || Boolean((job as any).providers?.mock)
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
       {/* Top Header */}
@@ -177,38 +267,87 @@ export const ResultStudioPage: React.FC<ResultStudioPageProps> = ({
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono text-slate-400">Job: {job.job_id}</span>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              Ready in Studio
+              Combined 1-Piece Video • Ready
             </span>
             <span className="text-xs text-slate-400 font-mono">
-              • Total: {totalDuration.toFixed(1)}s • {scenes.length} Scenes
+              • Total: {totalDuration.toFixed(1)}s • Continuous Playback
             </span>
           </div>
           <h1 className="text-2xl font-extrabold text-white tracking-tight mt-1">
-            Result Studio: Multi-Ratio B-Roll Player
+            Result Studio: Combined B-Roll Video Player
           </h1>
         </div>
 
-        {/* Aspect Ratio Switcher */}
-        <div className="flex items-center gap-1.5 p-1 bg-slate-900 rounded-xl border border-slate-800">
-          <span className="text-[10px] uppercase font-bold text-slate-400 px-2">Aspect:</span>
-          {(['16:9', '9:16', '1:1'] as AspectRatio[]).map(ratio => {
-            const isSelected = selectedRatio === ratio
-            return (
-              <button
-                key={ratio}
-                onClick={() => setSelectedRatio(ratio)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                  isSelected
-                    ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-                }`}
-              >
-                {ratio}
-              </button>
-            )
-          })}
+        {/* Aspect Ratio Switcher & Regenerate Button */}
+        <div className="flex flex-wrap items-center gap-3">
+          {onRegenerate && (
+            <button
+              type="button"
+              onClick={handleRegenerateWithVariation}
+              disabled={isRegenerating}
+              className="flex items-center gap-2 px-3.5 py-2 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-semibold transition shadow-sm active:scale-[0.98]"
+              title="Regenerate with a new variation and random seed"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isRegenerating ? 'animate-spin' : ''}`} />
+              <span>Regenerate with New Variation</span>
+            </button>
+          )}
+
+          <div className="flex items-center gap-1.5 p-1 bg-slate-900 rounded-xl border border-slate-800">
+            <span className="text-[10px] uppercase font-bold text-slate-400 px-2">Aspect:</span>
+            {(['16:9', '9:16', '1:1'] as AspectRatio[]).map(ratio => {
+              const isSelected = selectedRatio === ratio
+              return (
+                <button
+                  key={ratio}
+                  onClick={() => setSelectedRatio(ratio)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    isSelected
+                      ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  }`}
+                >
+                  {ratio}
+                </button>
+              )
+            })}
+          </div>
         </div>
       </div>
+
+      {/* Fallback / Mock Banner & Pipeline Warnings */}
+      {(isHighFallback || isMock || (job.warnings && job.warnings.length > 0)) && (
+        <div className={`mb-6 p-4 rounded-xl border flex flex-col gap-2 ${
+          isHighFallback
+            ? 'bg-rose-500/10 border-rose-500/40 text-rose-200'
+            : isMock
+            ? 'bg-amber-500/10 border-amber-500/40 text-amber-200'
+            : 'bg-amber-500/10 border-amber-500/30 text-amber-200'
+        }`}>
+          <div className="flex items-center gap-2 font-bold text-sm">
+            <AlertTriangle className={`w-4 h-4 shrink-0 ${isHighFallback ? 'text-rose-400' : 'text-amber-400'}`} />
+            <span>
+              {isHighFallback
+                ? `FALLBACK FOOTAGE WARNING • HIGH FALLBACK RATE (${fallbackPercent.toFixed(0)}% Fallback)`
+                : isMock
+                ? 'MOCK FOOTAGE BANNER • REAL STOCK PROVIDER NOT ENGAGED'
+                : 'Notice: Generation Adaptations Applied'}
+            </span>
+          </div>
+          {isHighFallback && (
+            <p className="text-xs text-rose-100/90 font-medium">
+              Notice: {fallbackCount} of {scenes.length} scenes ({fallbackPercent.toFixed(0)}%) used fallback title cards instead of real stock footage.
+            </p>
+          )}
+          {job.warnings && job.warnings.length > 0 && (
+            <ul className="list-disc list-inside space-y-0.5 text-slate-300 pl-1 font-mono text-[11px]">
+              {job.warnings.map((w, idx) => (
+                <li key={idx}>{w}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {/* Main Grid: Player on Left, Scene Inspector on Right */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
@@ -217,38 +356,44 @@ export const ResultStudioPage: React.FC<ResultStudioPageProps> = ({
           {/* Video Container */}
           <div className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col items-center justify-center p-2 relative group">
             <div className={`w-full ${aspectClass} relative rounded-xl overflow-hidden bg-slate-900 flex items-center justify-center`}>
-              {/* Dynamic Animated Motion Card / Visual Backing: Ensures video screen is NEVER a blank black screen */}
-              {(!isPlaying || videoError) && (
-                <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-emerald-950/40 to-slate-950 flex flex-col items-center justify-center p-6 text-center select-none pointer-events-none transition-opacity duration-300">
-                  <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-3 text-emerald-400 shadow-xl shadow-emerald-500/10 animate-pulse">
-                    <Film className="w-8 h-8" />
+              {/* Playback Error Fallback Card */}
+              {videoError && (
+                <div className="absolute inset-0 bg-slate-900/95 flex flex-col items-center justify-center p-6 text-center z-20">
+                  <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-3 text-amber-400 shadow-xl shadow-amber-500/10">
+                    <AlertTriangle className="w-7 h-7" />
                   </div>
-                  <span className="text-xs uppercase font-mono tracking-widest text-emerald-400 font-bold mb-1">
-                    Scene {activeSceneIndex + 1} • {currentScene?.provider?.toUpperCase() || 'PEXELS'}
-                  </span>
-                  <p className="text-sm font-semibold text-slate-200 max-w-md line-clamp-2 px-4">
-                    {currentScene?.visual_hint || currentScene?.text || 'B-Roll Footage'}
+                  <h3 className="text-sm font-bold text-white mb-1">
+                    Direct Video Playback Unavailable
+                  </h3>
+                  <p className="text-xs text-slate-400 max-w-sm mb-4">
+                    Your browser could not play this video directly. You can download the rendered MP4 file to play it locally.
                   </p>
-                  <span className="text-[11px] font-mono text-slate-400 mt-2 bg-slate-950/80 px-2.5 py-1 rounded-full border border-slate-800">
-                    {selectedRatio} • {currentScene?.duration?.toFixed(1) || '3.5'}s • Saliency Smart Crop Active
-                  </span>
+                  <a
+                    href={activeVideoSrc}
+                    download={`broll_${job.job_id}_${selectedRatio.replace(':', 'x')}.mp4`}
+                    className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-lg text-xs flex items-center gap-2 shadow-lg transition"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download Rendered MP4</span>
+                  </a>
                 </div>
               )}
 
               <video
                 ref={videoRef}
-                key={`${currentScene?.scene_id || activeSceneIndex}-${selectedRatio}`}
-                src={currentScene?.preview_url || '/videos/scene_01.mp4'}
+                key={activeVideoSrc}
+                src={activeVideoSrc}
+                controls
+                preload="metadata"
+                poster={currentScene?.preview_url || undefined}
                 playsInline
-                loop
+                autoPlay={isPlaying}
                 muted={isMuted}
-                className={`w-full h-full object-cover transition-opacity duration-300 ${
-                  videoError ? 'opacity-0' : 'opacity-100'
-                }`}
+                className="w-full h-full object-cover rounded-xl"
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
                 onError={() => {
-                  console.warn('Video failed to load, falling back to local scene');
+                  console.warn('Video failed to load:', activeVideoSrc);
                   setVideoError(true);
                 }}
                 onLoadedData={() => setVideoError(false)}
@@ -258,7 +403,7 @@ export const ResultStudioPage: React.FC<ResultStudioPageProps> = ({
               {showCaptions && (
                 <div className="absolute bottom-6 inset-x-4 flex justify-center pointer-events-none z-10">
                   <span className="bg-black/80 backdrop-blur-md px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold text-white tracking-wide text-center border border-white/10 shadow-2xl max-w-xl">
-                    {currentScene?.text || 'IncuBrix B-roll Engine'}
+                    {currentScene?.text || 'Broll Studio'}
                   </span>
                 </div>
               )}
@@ -282,9 +427,7 @@ export const ResultStudioPage: React.FC<ResultStudioPageProps> = ({
                   {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                 </button>
                 <button
-                  onClick={() => {
-                    if (videoRef.current) videoRef.current.currentTime = 0
-                  }}
+                  onClick={handleRestart}
                   className="p-1 hover:text-emerald-400 transition"
                   aria-label="Restart video"
                 >
@@ -337,7 +480,7 @@ export const ResultStudioPage: React.FC<ResultStudioPageProps> = ({
               </span>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
+            <div className={`grid gap-2 ${scenes.length >= 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
               {scenes.map((scene, idx) => {
                 const isActive = idx === activeSceneIndex
                 return (
@@ -558,7 +701,7 @@ export const ResultStudioPage: React.FC<ResultStudioPageProps> = ({
                 <ul className="space-y-1.5 list-disc pl-4 text-slate-300">
                   <li>Pexels Commercial License (Royalty-free)</li>
                   <li>Pixabay Clean License (Commercial use permitted)</li>
-                  <li>IncuBrix Generative AI Commercial Rights</li>
+                  <li>Broll Studio Generative AI Commercial Rights</li>
                 </ul>
               </div>
               <div className="p-4 bg-slate-950 rounded-xl border border-slate-800">
@@ -566,7 +709,7 @@ export const ResultStudioPage: React.FC<ResultStudioPageProps> = ({
                 <ul className="space-y-1.5 list-disc pl-4 text-slate-400">
                   <li>Mixkit Filmmaker Studio (Royalty Free)</li>
                   <li>Pixabay Motion Graphics Studio</li>
-                  <li>IncuBrix AI Synthesis Engine</li>
+                  <li>Broll Studio AI Synthesis Engine</li>
                 </ul>
               </div>
             </div>
