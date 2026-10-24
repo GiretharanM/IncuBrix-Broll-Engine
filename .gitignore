@@ -55,7 +55,9 @@ outputs/
 test_prof.mp4
 test_video.mp4
 scratch_*.py
-generate_submission_excel.py
+WhatsApp Video*.mp4
+demo_video_compressed.mp4
+frontend/public/demo.mp4
 
 
 # IDE
