@@ -5,7 +5,7 @@
 ---
 
 ## Live Demo & Studio
-- **Hosted Public Demo**: [https://redeem-each-photograph-smaller.trycloudflare.com](https://redeem-each-photograph-smaller.trycloudflare.com)
+- **Hosted Public Demo**: [https://redeem-each-photograph-smaller.trycloudflare.com](https://oclc-bus-berry-healing.trycloudflare.com/)
 - **API Documentation (Swagger UI)**: [https://redeem-each-photograph-smaller.trycloudflare.com/docs](https://redeem-each-photograph-smaller.trycloudflare.com/docs)
 - **OpenAPI 3.1 Specification**: [openapi.yaml](openapi.yaml)
 
