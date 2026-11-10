@@ -4,14 +4,14 @@
 
 ---
 
-## 🚀 Live Demo & Studio
+## Live Demo & Studio
 - **Hosted Public Demo**: [https://redeem-each-photograph-smaller.trycloudflare.com](https://redeem-each-photograph-smaller.trycloudflare.com)
 - **API Documentation (Swagger UI)**: [https://redeem-each-photograph-smaller.trycloudflare.com/docs](https://redeem-each-photograph-smaller.trycloudflare.com/docs)
 - **OpenAPI 3.1 Specification**: [openapi.yaml](openapi.yaml)
 
 ---
 
-## 🛠️ Key Capabilities
+## Key Capabilities
 1. **Multi-Input Generation**:
    - **Quick Prompt**: Single concise prompt (e.g. *"golden retriever puppy in a park"*) expanded into rich cinematic scenes.
    - **Script Text**: Full script segmented at natural sentence boundaries with synchronized local TTS voiceover (EN, HI, TA).
@@ -27,7 +27,7 @@
 
 ---
 
-## 📋 Quick Start
+##  Quick Start
 
 ### 1. Run with Docker Compose
 ```bash
@@ -49,7 +49,7 @@ npm run build
 
 ---
 
-## 📑 Standardized Error Codes
+##  Standardized Error Codes
 
 All errors conform to `{ "error": { "code", "message", "retryable", "details" } }`:
 
@@ -66,7 +66,7 @@ All errors conform to `{ "error": { "code", "message", "retryable", "details" } 
 
 ---
 
-## 📄 Documentation Links
+##  Documentation Links
 - **[REPORT.md](REPORT.md)**: Full architecture breakdown, pipeline trace, and benchmark metrics.
 - **[SOURCES.md](SOURCES.md)**: Commercial licensing ledger, stock API terms, and ambient audio licenses.
 - **[AI_USE.md](AI_USE.md)**: AI pair-programming disclosures, algorithm details, and verification methods.
